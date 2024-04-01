@@ -142,7 +142,7 @@ class ExerciseTester(object):
         """
         image = self.config['docker']['image']
         volume = f"{path}:{self.config['docker']['repo_volume_path']}"
-        command = ['docker', 'run', '--rm', '--network=none', f'--name="{repository.unique_name}"', '-v', volume, image]
+        command = ['docker', 'run', '--rm', '--network=none', '-v', volume, image]
 
         t_start = datetime.datetime.now()
         try:
@@ -166,7 +166,7 @@ class ExerciseTester(object):
             t_end = datetime.datetime.now()
 
         runtime = t_end - t_start
-        return (f'# Auswertung\n\nErgebnis: {status_message}\nLaufzeit: {runtime.seconds}s\nCode: {return_code}s\n\n'
+        return (f'# Auswertung\n\n- Ergebnis: {status_message}\n- Laufzeit: {runtime.seconds}s\n- Code: {return_code}\n\n'
                 f'## Ausgabe\n\n{output}\n\n'
                 f'## Fehlerausgabe\n\n{error}\n\n')
 
