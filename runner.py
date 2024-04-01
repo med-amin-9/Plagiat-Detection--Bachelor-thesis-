@@ -2,6 +2,8 @@ import toml
 import sys
 import os
 
+from toml import TomlDecodeError
+
 from tester import ExerciseTester
 
 
@@ -14,20 +16,24 @@ def get_configuration_paths() -> list[str]:
     if len(sys.argv) > 1 and os.path.isfile(sys.argv[1]):
         configuration_paths.append(sys.argv[1])
 
-    configuration_paths.append(os.path.join(os.getcwd(), "exercise-tester.py.toml"))
+    configuration_paths.append(os.path.join(os.getcwd(), "exercise-tester.toml"))
 
     if os.environ.get("HOME", None) is not None:
-        configuration_paths.append(os.path.join(os.environ["HOME"], ".exercise-tester.py.rc"))
+        configuration_paths.append(os.path.join(os.environ["HOME"], ".exercise-tester.rc"))
 
-    configuration_paths.append("/etc/default/exercise-tester.py.conf")
+    configuration_paths.append("/etc/default/exercise-tester.conf")
     return configuration_paths
 
 
 if __name__ == "__main__":
-    config = {}
+    configs = []
     for configuration_path in get_configuration_paths():
         if os.path.isfile(configuration_path):
-            config = toml.load(configuration_path)
-            break
+            try:
+                config = toml.load(configuration_path)
+                configs.append(config)
+            except TomlDecodeError:
+                print("File %s is not a valid toml" % configuration_path)
 
-    tester = ExerciseTester(config)
+    tester = ExerciseTester(configs)
+    tester.run()

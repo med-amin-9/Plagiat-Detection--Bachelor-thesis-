@@ -1,3 +1,5 @@
+import hashlib
+
 import utils
 
 
@@ -19,7 +21,11 @@ class Repository(object):
 
     @property
     def directory(self):
-        return 'repo_' + hex(hash(self._url))[2:]
+        return 'repo_' + hashlib.md5(self.url.encode()).hexdigest()
+
+    @property
+    def unique_name(self):
+        return self.directory
 
     def __repr__(self):
         """
