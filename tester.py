@@ -158,8 +158,8 @@ class ExerciseTester(object):
             status_message = "Abbruch durch Überschreitung der maximalen Laufzeit"
             return_code = '---'
         except subprocess.CalledProcessError as e:
-            output = e.stdout.decode('utf-8') if e.stdout is not None else ''
-            error = e.stderr.decode('utf-8') if e.stderr is not None else ''
+            output = e.stdout if e.stdout is not None else ''
+            error = e.stderr if e.stderr is not None else ''
             status_message = f"Anwendung mit Fehlercode beendet"
             return_code = e.returncode
         finally:
