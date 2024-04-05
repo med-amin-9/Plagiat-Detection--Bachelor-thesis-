@@ -1,17 +1,20 @@
 from __future__ import annotations
 
+import base64
 import datetime
 import re
 import logging
 import os.path
 import csv
 import subprocess
+import sys
 
 import requests
 import git
 from io import StringIO
 
 from furl import furl
+from requests.auth import HTTPBasicAuth
 
 import model
 import utils
@@ -214,6 +217,12 @@ class ExerciseTester(object):
                 else:
                     self.logger.error("Failed to read repositories from file at %s", path)
 
+            elif source.startswith('forks://'):
+                path = "https://" + source[len('forks://'):]
+                response = self._read_forked_repositories_from_api(path)
+                if response:
+                    repositories += response
+
             else:
                 repository = model.Repository(source)
                 repositories.append(repository)
@@ -221,6 +230,21 @@ class ExerciseTester(object):
         # Filter invalid repositories
         result = list(filter(lambda repo: repo is not None, repositories))
         self.logger.debug("Found %d repositories: %s", len(result), result)
+        return result
+
+    def _read_forked_repositories_from_api(self, endpoint: str) -> list[model.Repository]:
+        password = self.config['git']['password']
+        response = requests.get(endpoint + "/forks", headers={'PRIVATE-TOKEN': password})
+
+        result = []
+        if response.ok:
+            content = response.json()
+            for project in content:
+                repository = model.Repository(project['http_url_to_repo'])
+                result.append(repository)
+        else:
+            self.logger.error("Failed to read project from Gitlab API: %s", response.text)
+
         return result
 
     @staticmethod
