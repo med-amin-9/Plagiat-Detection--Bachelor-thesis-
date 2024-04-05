@@ -143,6 +143,7 @@ class ExerciseTester(object):
         :param path: The path where the source files are stored
         :return: Test result output to publish in the repository
         """
+        self.logger.info("Test repository %s in %s", repository.url, path)
         image = self.config['docker']['image']
         volume = f"{path}:{self.config['docker']['repo_volume_path']}"
         command = ['docker', 'run', '--rm', '--network=none', '-v', volume, image]
@@ -169,9 +170,10 @@ class ExerciseTester(object):
             t_end = datetime.datetime.now()
 
         runtime = t_end - t_start
+        logging.info("Finished in %d seconds with code %d", runtime.seconds, return_code)
         return (f'# Auswertung\n\n- Ergebnis: {status_message}\n- Laufzeit: {runtime.seconds}s\n- Code: {return_code}\n\n'
-                f'## Ausgabe\n\n{output}\n\n'
-                f'## Fehlerausgabe\n\n{error}\n\n')
+                f'## Ausgabe\n\n```\n{output}\n```\n\n'
+                f'## Fehlerausgabe\n\n```\n{error}\n```\n\n')
 
     def _run_with_clone(self, repository: model.Repository, path) -> None:
         """
