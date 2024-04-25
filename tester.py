@@ -236,7 +236,7 @@ class ExerciseTester(object):
 
     def _read_forked_repositories_from_api(self, endpoint: str) -> list[model.Repository]:
         password = self.config['git']['password']
-        response = requests.get(endpoint + "/forks", headers={'PRIVATE-TOKEN': password})
+        response = requests.get(endpoint + "/forks", headers={'PRIVATE-TOKEN': password}, params = {"per_page": "100"})
 
         result = []
         if response.ok:
