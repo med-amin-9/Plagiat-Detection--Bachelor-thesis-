@@ -93,6 +93,7 @@ class ExerciseTester(object):
         # Init repo
         self.logger.debug("Process repo %s at %s", repository.url, path)
         repo = git.Repo(path)
+        repo.git.reset('--hard', 'origin/master')
 
         # Update content
         for remote in repo.remotes:
