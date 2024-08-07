@@ -13,3 +13,17 @@ def ensure_list(e) -> list:
         return list(e)
     else:
         return [e]
+
+
+class Singleton(type):
+    """
+    Singleton base metaclass for
+    classes you only want one instance if
+    """
+    _instances = {}
+
+    def __call__(cls, *args, **kwargs):
+        if cls not in cls._instances:
+            cls._instances[cls] = super(Singleton, cls).__call__(*args, **kwargs)
+
+        return cls._instances[cls]
