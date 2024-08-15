@@ -157,8 +157,8 @@ class TestResult(object):
         # Print total points
         result += f'- Punkte: **{self.grade}** von **{self.points}**\n\n'
 
-        for test in self.tests:
-            result += test.message
+        for index, test in enumerate(self.tests):
+            result += f'## Test {index + 1}\n\n{test.message}'
 
         return result
 
@@ -208,7 +208,10 @@ class TestStepResult(object):
         Build the test evaluation string for the test case result
         :return: Result string to publish in grading receipt
         """
-        result = f'### Testergebnis für {self.test.name}\n'
+        result = f'- Test: *{self.test.name}*\n'
+
+        if self.test.description is not None:
+            result += f'- Beschreibung: {self.test.description}\n'
 
         # Append state line
         result += f'- Status: '
@@ -222,7 +225,7 @@ class TestStepResult(object):
         result += '\n'
 
         # Append successful state
-        result += f'- Erfolgreich: {"Ja" if self.successful else "Nein"}\n'
+        result += f'- Erfolgreich: **{"Ja" if self.successful else "Nein"}**\n'
 
         # Append runtime if available
         if self.runtime is not None:
@@ -233,12 +236,12 @@ class TestStepResult(object):
             result += f'- Punkte: **{self.test.points if self.successful else 0}**\n'
 
         # Append return code if available
-        if self.return_code:
-            result += f'- Return-Code / Fehlercode: {self.return_code}\n'
+        if self.return_code is not None:
+            result += f'- Return-Code / Fehlercode: `{self.return_code}`\n'
 
         # Append output
         if self.test_items:
-            result += f'##### Tests\n'
+            result += f'##### Testschritte\n'
             for text, success in self.test_items:
                 if success is True or success is False:
                     result += f'- {text}: {"OK" if success else "fehlgeschlagen"}\n'
@@ -248,10 +251,10 @@ class TestStepResult(object):
             result += '\n'
 
         if self.output:
-            result += f'##### Ausgabe\n```\n{self.output}\n```\n\n'
+            result += f'##### Ausgabe\n\n```{self.output.strip()}\n```\n\n'
 
         if self.error:
-            result += f'##### Fehlerausgabe\n```\n{self.error}\n```\n\n'
+            result += f'##### Fehlerausgabe\n\n```{self.error.strip()}\n```\n\n'
 
         return result
 
@@ -299,6 +302,10 @@ class BasicTest(object):
     @property
     def name(self):
         return self.options['name']
+
+    @property
+    def description(self):
+        return self.options.get('description', None)
 
     @property
     def terminate_on_fail(self):
@@ -502,20 +509,20 @@ class CommandTest(BasicTest):
 
             # Check desired output on all channels
             for key, title, target, f in [
-                ('output', 'Erwartete Ausgabe', result.output, re.search),
-                ('output_match', 'Erwartete Ausgabe', result.output, re.match),
-                ('error', 'Erwartete Fehler-Ausgabe', result.error, re.search),
-                ('error_match', 'Erwartete Fehler-Ausgabe', result.error, re.match)
+                ('output', 'Ausgabe enthält String', result.output, re.search),
+                ('output_match', 'Ausgabe passt auf', result.output, re.match),
+                ('error', 'Fehler-Ausgabe enthält String', result.error, re.search),
+                ('error_match', 'Fehler-Ausgabe passt auf', result.error, re.match)
             ]:
                 if self.options.get(key, None) is not None:
                     success = f(self.options[key], target) is not None
-                    result.test_items.append((f'{title} \'{self.options[key]}\'', success))
+                    result.test_items.append((f'{title} `{self.options[key]}`', success))
                     result.successful &= success
 
             if self.options.get('return_code', None) is not None:
                 codes = utils.ensure_list(self.options['return_code'])
                 success = result.return_code in codes
-                result.test_items.append(('Erwarteter Rückgabe-Code', success))
+                result.test_items.append((f'Rückgabe-Code ist `{" oder ".join(map(str, codes))}`', success))
                 result.successful &= success
 
         except subprocess.TimeoutExpired as e:
@@ -546,8 +553,8 @@ class DockerCommandTest(CommandTest):
             raise Exception("Docker image must be supplied for the test")
 
         image = options['image']
-        self.volume = self.options.get('repo_volume_path', '/repo')
-        volume = f"{os.getcwd()}:{self.volume}"
+        self.volume = options.get('repo_volume_path', '/repo')
+        volume = f".:{self.volume}"
 
         # Build basic docker command
         command = ['docker', 'run', '--rm', '--network=none', '-v', volume, image]
@@ -557,7 +564,7 @@ class DockerCommandTest(CommandTest):
             command += options['command']
 
         # Supply interactive switch if stdin-data is required
-        if self.options.get('input', None) is not None:
+        if options.get('input', None) is not None:
             command.insert(2, "-i")
 
         options['command'] = command

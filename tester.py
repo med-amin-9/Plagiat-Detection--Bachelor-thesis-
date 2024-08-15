@@ -82,6 +82,8 @@ class ExerciseTester(object):
                 else:
                     self.logger.debug(f"Simulated Grading {result.grade} for {repo}")
                     self.logger.debug(f"Grading message {result.message}")
+            else:
+                self.logger.debug(f"{repo} has no updates - skipping")
 
     def _read_test_config(self) -> None:
         """

@@ -461,7 +461,7 @@ class MoodleEndpoint(Endpoint):
         """
         updated_at = repository.data['submission'].get('timemodified')
         last_grading = repository.metadata.get(repository.MODIFIED_AT_METADATA_KEY)
-        return last_grading is not None and last_grading >= updated_at
+        return last_grading is not None and last_grading < updated_at
 
     def unzip(self, repository: model.Repository, remove_archive: bool):
         """
