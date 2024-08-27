@@ -401,7 +401,11 @@ class MoodleEndpoint(Endpoint):
         if parameters is not None:
             params.update(parameters)
 
-        result = requests.request(method, endpoint, params=params)
+        if method == 'GET':
+            result = requests.get(endpoint, params=params)
+        else:
+            result = requests.request(method, endpoint, data=params)
+
         if not result.ok:
             raise Exception(result.text)
 

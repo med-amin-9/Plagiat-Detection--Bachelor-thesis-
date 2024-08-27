@@ -508,15 +508,19 @@ class CommandTest(BasicTest):
             result.return_code = process.returncode
 
             # Check desired output on all channels
-            for key, title, target, f in [
-                ('output', 'Ausgabe enthält String', result.output, re.search),
-                ('output_match', 'Ausgabe passt auf', result.output, re.match),
-                ('error', 'Fehler-Ausgabe enthält String', result.error, re.search),
-                ('error_match', 'Fehler-Ausgabe passt auf', result.error, re.match)
+            for key, title_public, title_hidden, target, f in [
+                ('output', 'Ausgabe enthält String', 'Ausgabe ist korrekt', result.output, re.search),
+                ('output_match', 'Ausgabe passt auf', 'Ausgabe ist korrekt', result.output, re.match),
+                ('error', 'Fehler-Ausgabe enthält String', 'Fehler-Ausgabe ist korrekt', result.error, re.search),
+                ('error_match', 'Fehler-Ausgabe passt auf', 'Fehler-Ausgabe ist korrekt', result.error, re.match)
             ]:
                 if self.options.get(key, None) is not None:
                     success = f(self.options[key], target) is not None
-                    result.test_items.append((f'{title} `{self.options[key]}`', success))
+                    if self.options.get('show_expected_output', False):
+                        result.test_items.append((f'{title_public} `{self.options[key]}`', success))
+                    else:
+                        result.test_items.append((title_hidden, success))
+
                     result.successful &= success
 
             if self.options.get('return_code', None) is not None:
