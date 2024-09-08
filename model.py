@@ -1,10 +1,13 @@
 import datetime
 import hashlib
 import os
+import random
 import re
+import string
 import subprocess
 import tempfile
 from collections.abc import Mapping
+import time
 
 import toml
 
@@ -497,14 +500,26 @@ class CommandTest(BasicTest):
         """
 
         result.successful = True
+        pid = 0
         try:
             timeout = None if self.timeout is None or self.timeout < 0 else self.timeout
             input_data = self.options.get('input', None)
-            process = subprocess.run(self.command, input=input_data, capture_output=True, timeout=timeout,
-                                     check=True, text=True)
+            process = subprocess.Popen(self.command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                       stdin=subprocess.PIPE, text=True)
 
-            result.output = process.stdout if process.stdout is not None else ''
-            result.error = process.stderr if process.stderr is not None else ''
+            pid = process.pid
+            if input_data is not None:
+                if isinstance(input_data, str):
+                    process.stdin.write(input_data)
+                else:
+                    for input_config in input_data:
+                        process.stdin.write(input_config.get('data'))
+                        process.stdin.flush()
+                        time.sleep(input_config.get('sleep', 0))
+
+            output, error = process.communicate(timeout=timeout)
+            result.output = output if output is not None else ''
+            result.error = error if error is not None else ''
             result.return_code = process.returncode
 
             # Check desired output on all channels
@@ -532,12 +547,23 @@ class CommandTest(BasicTest):
         except subprocess.TimeoutExpired as e:
             result.output = e.stdout.decode('utf-8') if e.stdout is not None else ''
             result.error = e.stderr.decode('utf-8') if e.stderr is not None else ''
+            result.error += "\nAbbruch nach Überschreitung des Zeitlimits"
             result.successful = False
+            self.kill(pid)
 
         except subprocess.CalledProcessError as e:
             result.output = e.stdout if e.stdout is not None else ''
             result.error = e.stderr if e.stderr is not None else ''
+            result.error += "\nAbbruch nach Fehler beim Aufruf des Befehls"
             result.successful = False
+            self.kill(pid)
+
+    def kill(self, pid):
+        """
+        Kill and cleanup the process after failure
+        :param pid: process id to kill
+        """
+        pass
 
 
 class DockerCommandTest(CommandTest):
@@ -560,8 +586,11 @@ class DockerCommandTest(CommandTest):
         self.volume = options.get('repo_volume_path', '/repo')
         volume = f".:{self.volume}"
 
+        # Determine random name
+        self.container_name = "".join([random.choice(string.hexdigits) for _ in range(32)])
+
         # Build basic docker command
-        command = ['docker', 'run', '--rm', '--network=none', '-v', volume, image]
+        command = ['docker', 'run', '-i', '--name', self.container_name, '--rm', '--network=none', '-v', volume, image]
 
         # If a special command is given use this instead of the container command
         if options.get('command', None) is not None:
@@ -573,3 +602,6 @@ class DockerCommandTest(CommandTest):
 
         options['command'] = command
         super(DockerCommandTest, self).__init__(options)
+
+    def kill(self, pid):
+        subprocess.run(['docker', 'kill', '-s', '9', self.container_name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
