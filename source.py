@@ -13,6 +13,7 @@ class Source(object):
     Declares a new source for submissions
     """
 
+    TYPE_LOCAL = "local"
     TYPE_GITLAB = "gitlab"
     TYPE_MOODLE = "moodle"
     TYPE_LOCAL_CSV = "local_csv"
@@ -36,6 +37,13 @@ class Source(object):
                 self.submissions = self._read_submissions_from_csv(data)
             else:
                 raise Exception(f"Failed to fetch sources from {url}")
+
+        elif url.startswith('local://'):
+            self.type = Source.TYPE_LOCAL
+
+            path = url[len('local://'):]
+            repository = factory.get_endpoint('local').get_repository_with_path(path)
+            self.submissions = [repository]
 
         elif url.startswith('file://'):
             self.type = Source.TYPE_LOCAL_CSV

@@ -44,6 +44,72 @@ class Endpoint(object):
         pass
 
 
+class LocalEndpoint(Endpoint):
+    """
+    Defines local repositories
+    """
+    def __init__(self) -> None:
+        """
+        Set up the local endpoint
+        """
+        super().__init__({}, {})
+
+    def get_repository_with_path(self, path: str) -> model.Repository:
+        """
+        Create a repository model for a local path
+        :param path: Path where the project is stored
+        :return: Model repository
+        """
+        return model.Repository(self, path, {"path": path})
+
+    def download(self, repository: model.Repository):
+        """
+        Download the given repository
+        :param repository: Repository model for a git repository to be downloaded
+        :return: None
+        """
+        if os.path.exists(repository.path) and self.has_update(repository):
+            # Remove the old content
+            shutil.rmtree(repository.path)
+
+        path = repository.data.get("path")
+        for root, dirs, files in os.walk(path):
+            sub_dir = root[len(path):]
+            destination_path = os.path.normpath(repository.path + "/" + sub_dir)
+            os.makedirs(destination_path, exist_ok=True)
+            for file in files:
+                shutil.copyfile(os.path.join(root, file), os.path.join(destination_path, file))
+
+    @staticmethod
+    def has_update(repository: model.Repository) -> bool:
+        """
+        Check if the given repository has a new submission to check
+        :param repository: Repository to test
+        :return: true if updates are available a new test should be performed
+        """
+        return True
+
+    def submit_grade(self, repository: model.Repository, grade: int, message: str):
+        """
+        Save grading information to the given repository
+        :param repository: Repository to save grading information to
+        :param grade: Grade (should be in range of 0 - 100)
+        :param message: Grading details message
+        :return: None
+        """
+
+        self.logger.warning(f"Submitting grading {grade}/100 for local repository {repository.identifier}")
+        self.logger.warning(message)
+
+    @property
+    def supports_unzip(self) -> bool:
+        """
+        Indicator if this endpoint supports unzipping content
+        :return: True if the endpoint supports unzipping content
+        """
+        return False
+
+
 class GitlabEndpoint(Endpoint):
     """
     Defines an endpoint to a gitlab instance
@@ -432,7 +498,7 @@ class MoodleEndpoint(Endpoint):
             destination = os.path.join(destination_path, file.get('filename'))
 
             url = file.get("fileurl")
-            logging.debug(f"Downloading {url} to {destination}")
+            self.logger.debug(f"Downloading {url} to {destination}")
             with requests.get(url, params={"token": self.token}, stream=True) as request:
                 request.raise_for_status()
                 with open(destination, 'wb') as f:
@@ -544,7 +610,7 @@ class MoodleEndpoint(Endpoint):
             "plugindata[assignfeedbackcomments_editor][format]": "1"
         }
 
-        logging.debug(f"Submitting grading {grade}/100 for {repository.identifier}")
+        self.logger.debug(f"Submitting grading {grade}/100 for {repository.identifier}")
         self._call('POST', 'mod_assign_save_grade', params)
 
 
@@ -555,6 +621,7 @@ class EndpointFactory(object, metaclass=utils.Singleton):
 
     TYPE_GITLAB = "git"
     TYPE_MOODLE = "moodle"
+    TYPE_LOCAL = "local"
 
     def __init__(self):
         self.endpoints = {}
@@ -571,6 +638,8 @@ class EndpointFactory(object, metaclass=utils.Singleton):
             self.endpoints[name] = GitlabEndpoint(configuration)
         elif endpoint_type == EndpointFactory.TYPE_MOODLE:
             self.endpoints[name] = MoodleEndpoint(configuration)
+        elif endpoint_type == EndpointFactory.TYPE_LOCAL:
+            self.endpoints[name] = LocalEndpoint()
         else:
             raise ValueError(f"Unsupported endpoint type: {endpoint_type}")
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os.path
+import sys
 
 import model
 import utils
@@ -47,6 +48,7 @@ class ExerciseTester(object):
         # Setup endpoints
         EndpointFactory.get().register_endpoint('gitlab', EndpointFactory.TYPE_GITLAB, self.config.get('git'))
         EndpointFactory.get().register_endpoint('moodle', EndpointFactory.TYPE_MOODLE, self.config.get('moodle'))
+        EndpointFactory.get().register_endpoint('local', EndpointFactory.TYPE_LOCAL, {})
 
         # Fetch repos
         self.repositories = self._fetch_targets()
@@ -111,6 +113,22 @@ class ExerciseTester(object):
 
         self.logger.info(f'Read {len(self.tests)} tests')
         max_points = sum(map(lambda t: t.points, self.tests))
+        auto_points_tests = list(filter(lambda t: t.has_auto_points, self.tests))
+        if len(auto_points_tests) > 0:
+            if max_points > 100:
+                self.logger.error("Auto point generation requested but max points already greater 100")
+                sys.exit(1)
+
+            difference = 100 - max_points
+            points_per_test = difference // len(auto_points_tests)
+            for index, test in enumerate(auto_points_tests):
+                if index == len(auto_points_tests) - 1:
+                    test.update_points(100 - (max_points + (len(auto_points_tests) - 1) * points_per_test));
+                else:
+                    test.update_points(points_per_test)
+
+            max_points = 100
+
         if max_points != 100:
             self.logger.info(f'Total number of points of test are {max_points} but should be 100')
 

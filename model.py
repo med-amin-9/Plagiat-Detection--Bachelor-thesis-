@@ -1,4 +1,5 @@
 import datetime
+import glob
 import hashlib
 import os
 import random
@@ -316,7 +317,15 @@ class BasicTest(object):
 
     @property
     def points(self):
-        return self.options.get('points', 0)
+        p = self.options.get('points', 0)
+        return p if p != 'auto' else 0
+
+    @property
+    def has_auto_points(self):
+        return self.options.get('points') == 'auto'
+
+    def update_points(self, p):
+        self.options['points'] = p
 
     def run(self, result: TestStepResult) -> TestStepResult:
         """
@@ -471,6 +480,8 @@ class CommandTest(BasicTest):
     """
     TYPE = "command"
 
+    COMMAND_OPTION_PREFIX_GLOB = "__glob:"
+
     def __init__(self, options):
         """
         Init a command execution based test with options
@@ -489,8 +500,27 @@ class CommandTest(BasicTest):
         if 'command' not in options:
             raise Exception("Command must be supplied for the test")
 
-        self.command = utils.ensure_list(options['command'])
         self.timeout = self.options.get('timeout', -1)
+        self.command = utils.ensure_list(options['command'])
+
+    def prepare_command(self, command: list[str]) -> list[str]:
+        """
+        Pre-process command and options and allow derived classes to manipulate the command string
+        :param command: Configuration supplied command string
+        :return: Fixed command string
+        """
+        result = []
+
+        for item in command:
+            if item.startswith(self.COMMAND_OPTION_PREFIX_GLOB):
+                item = item[len(self.COMMAND_OPTION_PREFIX_GLOB):]
+                matches = glob.glob(item)
+                s = os.getcwd()
+                result += matches
+            else:
+                result.append(item)
+
+        return result
 
     def run(self, result: TestStepResult):
         """
@@ -502,9 +532,10 @@ class CommandTest(BasicTest):
         result.successful = True
         pid = 0
         try:
+            command = self.prepare_command(self.command)
             timeout = None if self.timeout is None or self.timeout < 0 else self.timeout
             input_data = self.options.get('input', None)
-            process = subprocess.Popen(self.command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                        stdin=subprocess.PIPE, text=True)
 
             pid = process.pid
@@ -582,26 +613,31 @@ class DockerCommandTest(CommandTest):
         if 'image' not in options:
             raise Exception("Docker image must be supplied for the test")
 
-        image = options['image']
         self.volume = options.get('repo_volume_path', '/repo')
-        volume = f".:{self.volume}"
 
         # Determine random name
         self.container_name = "".join([random.choice(string.hexdigits) for _ in range(32)])
+        if 'command' not in options:
+            options['command'] = []
 
+        super(DockerCommandTest, self).__init__(options)
+
+    def prepare_command(self, command: list[str]) -> list[str]:
+        """
+        Pre-process command and options and allow derived classes to manipulate the command string
+        :param command: Configuration supplied command string
+        :return: Fixed command string
+        """
         # Build basic docker command
-        command = ['docker', 'run', '-i', '--name', self.container_name, '--rm', '--network=none', '-v', volume, image]
+        volume = f".:{self.volume}"
+        command = ['docker', 'run', '-i', '--name', self.container_name, '--rm', '--network=none', '-v', volume,
+                   self.options['image']]
 
         # If a special command is given use this instead of the container command
-        if options.get('command', None) is not None:
-            command += options['command']
+        if len(self.options.get('command', [])) > 0:
+            command += super(DockerCommandTest, self).prepare_command(self.options['command'])
 
-        # Supply interactive switch if stdin-data is required
-        if options.get('input', None) is not None:
-            command.insert(2, "-i")
-
-        options['command'] = command
-        super(DockerCommandTest, self).__init__(options)
+        return command
 
     def kill(self, pid):
         subprocess.run(['docker', 'kill', '-s', '9', self.container_name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
