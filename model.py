@@ -187,6 +187,7 @@ class TestStepResult(object):
         self.return_code = None
         self.test = test
         self.test_items = []
+        self.additional_records = []
         self.runtime = None
 
     def run(self):
@@ -242,6 +243,11 @@ class TestStepResult(object):
         # Append return code if available
         if self.return_code is not None:
             result += f'- Return-Code / Fehlercode: `{self.return_code}`\n'
+
+        # Append additional records data
+        if self.additional_records:
+            for additional_record in self.additional_records:
+                result += f'- {additional_record[0]}: `{additional_record[1]}`\n'
 
         # Append output
         if self.test_items:
@@ -503,11 +509,19 @@ class CommandTest(BasicTest):
         self.timeout = self.options.get('timeout', -1)
         self.command = utils.ensure_list(options['command'])
 
-    def prepare_command(self, command: list[str]) -> list[str]:
+    @property
+    def command_invocation(self) -> str:
         """
-        Pre-process command and options and allow derived classes to manipulate the command string
-        :param command: Configuration supplied command string
-        :return: Fixed command string
+        Return the printable command
+        :return: command print string
+        """
+        return " ".join(self._apply_glob(self.command))
+
+    def _apply_glob(self, command: list[str]) -> list[str]:
+        """
+        Apply any glob placeholders in the command string
+        :param command: Command to process
+        :return: Updated command record
         """
         result = []
 
@@ -522,6 +536,14 @@ class CommandTest(BasicTest):
 
         return result
 
+    def prepare_command(self, command: list[str]) -> list[str]:
+        """
+        Pre-process command and options and allow derived classes to manipulate the command string
+        :param command: Configuration supplied command string
+        :return: Fixed command string
+        """
+        return self._apply_glob(command)
+
     def run(self, result: TestStepResult):
         """
         Execute the test
@@ -533,6 +555,9 @@ class CommandTest(BasicTest):
         pid = 0
         try:
             command = self.prepare_command(self.command)
+            if self.options.get('show_command', True):
+                result.additional_records.append(('Kommandozeile', self.command_invocation))
+
             timeout = None if self.timeout is None or self.timeout < 0 else self.timeout
             input_data = self.options.get('input', None)
             process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
