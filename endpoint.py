@@ -70,6 +70,7 @@ class LocalEndpoint(Endpoint):
         """
         if os.path.exists(repository.path) and self.has_update(repository):
             # Remove the old content
+            self.logger.info("Remove existing data in path %s", repository.path)
             shutil.rmtree(repository.path)
 
         path = repository.data.get("path")
@@ -486,6 +487,7 @@ class MoodleEndpoint(Endpoint):
         self.logger.debug(f"Fetching moodle submission {repository}")
         if os.path.exists(repository.path) and self.has_update(repository):
             # Remove the old content
+            self.logger.info("Remove existing data in path %s", repository.path)
             shutil.rmtree(repository.path)
 
         # Fetch files for the repository
