@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import os.path
 import sys
+import datetime
 
 import model
 import utils
@@ -66,6 +67,20 @@ class ExerciseTester(object):
         """
         path = self.working_directory
         self.logger.info(f"Run tests in base directory {path}")
+
+        # Check if execution is requested now
+        now = datetime.datetime.now()
+        if self.config['general']['valid_until']:
+            valid_until = self.config['general']['valid_until']
+            if now > valid_until:
+                self.logger.info(f"Testing is disabled because now({now}) > valid_until({valid_until})")
+                return
+
+        if self.config['general']['not_valid_before']:
+            not_valid_before = self.config['general']['not_valid_before']
+            if now < not_valid_before:
+                self.logger.info(f"Testing is disabled because now({now}) < not_valid_before({not_valid_before})")
+                return
 
         for repo in self.repositories:
             self.logger.debug(f"Fetching repository {repo}")

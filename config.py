@@ -5,7 +5,9 @@ DEFAULT_CONFIGURATION = {
         'always_run_tests': False,  # Ignore any cached results and always run tests
         'simulate': True,  # Do not submit results
         'unzip_submissions': False,  # If the submission consists of a single .zip file then extract it if set to True
-        'remove_archive_after_unzip': False  # Set to true to remove any zip files after auto unzipping took place
+        'remove_archive_after_unzip': False,  # Set to true to remove any zip files after auto unzipping took place
+        'valid_until': None, # Timestamp until the tests should be executed
+        'not_valid_before': None, # Earliest timestamp since when the tests should be executed
     },
 
     'docker': {
