@@ -8,6 +8,7 @@ import model
 import utils
 from endpoint import EndpointFactory
 from config import DEFAULT_CONFIGURATION
+from model import TestStorage
 from source import Source
 from collections.abc import Mapping
 
@@ -107,9 +108,10 @@ class ExerciseTester(object):
             raise Exception("No test configuration specified")
 
         self.tests = []
+        self.storage = TestStorage()
         self.logger.debug('Read tests')
         for test_config in self.config['tests']:
-            self.tests.append(model.BasicTest.from_configuration(test_config))
+            self.tests.append(model.BasicTest.from_configuration(test_config, self.storage))
 
         self.logger.info(f'Read {len(self.tests)} tests')
         max_points = sum(map(lambda t: t.points, self.tests))

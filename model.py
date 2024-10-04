@@ -161,8 +161,11 @@ class TestResult(object):
         # Print total points
         result += f'- Punkte: **{self.grade}** von **{self.points}**\n\n'
 
+        display_index = 1
         for index, test in enumerate(self.tests):
-            result += f'## Test {index + 1}\n\n{test.message}'
+            if test.test.visible:
+                result += f'## Test {display_index}\n\n{test.message}'
+                display_index += 1
 
         return result
 
@@ -269,12 +272,19 @@ class TestStepResult(object):
         return result
 
 
+class TestStorage(dict):
+    """
+    Class to exchange data between tests
+    """
+    pass
+
+
 class BasicTest(object):
     """
     Basic test class all tests are derived from
     """
 
-    def __init__(self, options):
+    def __init__(self, options, storage: TestStorage):
         """
         Init the base test with options
         :param options: Test configuration options - supported parameters are:
@@ -282,26 +292,32 @@ class BasicTest(object):
              name: str - Human readable name of the test
              terminate_on_fail: True|False - End execution if the test fails
              points: int - Number of points to assign if the test is successful
+        :param storage: Test interchange storage
         """
         self.options = options
         for key in ['type', 'name']:
             if key not in self.options:
                 raise KeyError(f'Missing test option: {key}')
 
+        self.storage = storage
+
     @staticmethod
-    def from_configuration(config):
+    def from_configuration(config, storage: TestStorage):
         """
         Build a test model from the given configuration
         :param config: Configuration to process
+        :param storage: Test interchange storage
         :return: appropriate test case model
         """
         t = config.get('type')
         if t == FileTest.TYPE:
-            return FileTest(config)
+            return FileTest(config, storage)
         elif t == CommandTest.TYPE:
-            return CommandTest(config)
+            return CommandTest(config, storage)
         elif t == DockerCommandTest.TYPE:
-            return DockerCommandTest(config)
+            return DockerCommandTest(config, storage)
+        elif t == FileLocateTest.TYPE:
+            return FileLocateTest(config, storage)
         else:
             raise Exception(f'Unknown test type "{t}"')
 
@@ -316,6 +332,10 @@ class BasicTest(object):
     @property
     def description(self):
         return self.options.get('description', None)
+
+    @property
+    def visible(self):
+        return self.options.get('visible', True)
 
     @property
     def terminate_on_fail(self):
@@ -348,6 +368,71 @@ class BasicTest(object):
         return f'Test {self.name} with type {self.type}'
 
 
+class FileLocateTest(BasicTest):
+    """
+    Test to find a certain file
+    """
+    TYPE = "locate"
+
+    def __init__(self, options, storage: TestStorage):
+        """
+        Init a file based test with options
+        :param options: Test configuration options - supported parameters besides BasicTest-options are:
+            glob: str - glob to match for files
+            recursive: bool (Default False) - search the glob recursively
+            max_num_matches: int - (Default 1) maximum number of matches
+            min_num_matches: int - (Default 1) minimum number of matches
+            directory: str - directory to apply glob in
+        :param storage: Test interchange storage
+        """
+        super(FileLocateTest, self).__init__(options, storage)
+
+        self.glob = self.options.get("glob")
+        if not self.glob:
+            raise Exception("glob parameter is required")
+
+        self.recursive = self.options.get("recursive", False)
+        self.max_num_matches = self.options.get("max_num_matches", 1)
+        self.min_num_matches = self.options.get("min_num_matches", 1)
+        self.directory = self.options.get("directory")
+
+    def run(self, result: TestStepResult):
+        """
+        Execute the test
+        :param result: Container to write the result of the test to
+        """
+        cwd = os.getcwd()
+        if self.directory is not None:
+            try:
+                os.chdir(self.directory)
+            except OSError:
+                result.test_items.append((f"Angefordertes Verzeichnis {self.directory} wurde nicht gefunden", False))
+                result.successful = False
+                return
+
+        items = glob.glob(self.glob, recursive=self.recursive)
+        if len(items) < self.min_num_matches:
+            result.test_items.append(
+                (f"Für {self.glob} wurden nur {len(items)} von {self.min_num_matches} Dateien gefunden", False))
+            result.successful = False
+        elif len(items) > self.max_num_matches:
+            result.test_items.append(
+                (f"Für {self.glob} wurden {len(items)} von maximal {self.min_num_matches} Dateien gefunden", False))
+            result.successful = False
+        else:
+            result.test_items.append(
+                (f"Für {self.glob} wurde {', '.join(items)} gefunden", True))
+            result.successful = True
+
+        os.chdir(cwd)
+
+        if self.options.get('storage'):
+            self.storage[self.options['storage']] = items if result.successful else []
+
+        if self.options.get('storage_error'):
+            self.storage[self.options['storage_error']] = items if not result.successful else []
+
+
 class FileTest(BasicTest):
     """
     Test to check the status of a file
@@ -358,7 +443,7 @@ class FileTest(BasicTest):
     MODE_CONTAINS = "contains"  # Check if the given items contains the given content
     MODE_HASH = "hash"  # Check if the given items match the given hashes
 
-    def __init__(self, options):
+    def __init__(self, options, storage: TestStorage):
         """
         Init a file based test with options
         :param options: Test configuration options - supported parameters besides BasicTest-options are:
@@ -367,8 +452,9 @@ class FileTest(BasicTest):
             allow_other: bool (Default True) - Indicator if other items are allowed to be present
             contents: str|list[str]|dict[str, str] - File contents to match the content of files against (MODE_CONTAINS)
             hashes: str|list[str]|dict[str, str] - Hashes to test the files against (MODE_HASH)
+        :param storage: Test interchange storage
         """
-        super(FileTest, self).__init__(options)
+        super(FileTest, self).__init__(options, storage)
         self.mode = self.options.get('mode', FileTest.MODE_EXIST)
         if self.mode not in [FileTest.MODE_EXIST, FileTest.MODE_HASH, FileTest.MODE_CONTAINS, FileTest.MODE_NOT_EXIST]:
             raise Exception("Invalid test mode")
@@ -417,11 +503,19 @@ class FileTest(BasicTest):
         :return: None
         """
         result.successful = True
+        success_items = []
+        failure_items = []
         for item in self.items:
             success = os.path.exists(item) == desired_state
             message = f'{item} soll {"vorhanden" if desired_state else "nicht vorhanden"} sein'
             result.test_items.append((message, success))
             result.successful &= success
+            if success:
+                success_items.append(item)
+            else:
+                failure_items.append(item)
+
+        self._update_storage(success_items, failure_items)
 
     def _run_contains_check(self, result):
         """
@@ -430,26 +524,37 @@ class FileTest(BasicTest):
         :return: None
         """
         result.successful = True
+        success_items = []
+        failure_items = []
         for index, item in enumerate(self.items):
             message = f'Inhalt von {item} prüfen'
             desired_content = self.contents[item] if isinstance(self.contents, Mapping) else self.contents[index]
             try:
                 with open(item, 'r') as fd:
                     content = fd.read()
-                    success = desired_content in content
+                    success = re.search(desired_content, content) is not None
 
                 result.test_items.append((message, success))
                 result.successful &= success
+                if success:
+                    success_items.append(item)
+                else:
+                    failure_items.append(item)
 
             except FileNotFoundError:
                 result.test_items.append((message, 'DATEI nicht gefunden'))
                 result.successful = False
+                failure_items.append(item)
             except IsADirectoryError:
                 result.test_items.append((message, 'Objekt ist ein VERZEICHNIS'))
                 result.successful = False
+                failure_items.append(item)
             except PermissionError:
                 result.test_items.append((message, 'KEINE ZUGRIFFSBERECHTIGUNG'))
                 result.successful = False
+                failure_items.append(item)
+
+        self._update_storage(success_items, failure_items)
 
     def _run_hash_check(self, result):
         """
@@ -458,6 +563,8 @@ class FileTest(BasicTest):
         :return: None
         """
         result.successful = True
+        success_items = []
+        failure_items = []
         for index, item in enumerate(self.items):
             sha1 = hashlib.sha1()
             desired_hash = self.hashes[item] if isinstance(self.hashes, Mapping) else self.hashes[index]
@@ -475,10 +582,29 @@ class FileTest(BasicTest):
                 success = desired_hash != h
                 result.test_items.append((message, success))
                 result.successful &= success
+                if success:
+                    success_items.append(item)
+                else:
+                    failure_items.append(item)
             else:
                 result.test_items.append((message, 'Objekt NICHT GEFUNDEN'))
                 result.successful = False
+                failure_items.append(item)
 
+        self._update_storage(success_items, failure_items)
+
+    def _update_storage(self, success_items, failure_items):
+        """
+        Update the storage to publish matched items
+        :param success_items: Successfully detected items
+        :param failure_items: Failed to locate items
+        :return:
+        """
+        if self.options.get('storage'):
+            self.storage[self.options['storage']] = success_items
+
+        if self.options.get('storage_error'):
+            self.storage[self.options['storage_error']] = failure_items
 
 class CommandTest(BasicTest):
     """
@@ -487,8 +613,10 @@ class CommandTest(BasicTest):
     TYPE = "command"
 
     COMMAND_OPTION_PREFIX_GLOB = "__glob:"
+    COMMAND_OPTION_PREFIX_STORAGE = "__storage:"
+    COMMAND_OPTION_PREFIX_PATTERN = "__pattern:"
 
-    def __init__(self, options):
+    def __init__(self, options, storage: TestStorage):
         """
         Init a command execution based test with options
         :param options: Test configuration options - supported parameters besides BasicTest-options are:
@@ -500,8 +628,9 @@ class CommandTest(BasicTest):
             output_match: str - Regular expression of required output (optional) - this is tested with re.match
             error: str - Regular expression of required error output (optional) - this is tested with re.search
             error_match: str - Regular expression of required error output (optional) - this is tested with re.match
+        :param storage: Test interchange storage
         """
-        super(CommandTest, self).__init__(options)
+        super(CommandTest, self).__init__(options, storage)
 
         if 'command' not in options:
             raise Exception("Command must be supplied for the test")
@@ -515,11 +644,11 @@ class CommandTest(BasicTest):
         Return the printable command
         :return: command print string
         """
-        return " ".join(self._apply_glob(self.command))
+        return " ".join(self._apply_replacements(self.command))
 
-    def _apply_glob(self, command: list[str]) -> list[str]:
+    def _apply_replacements(self, command: list[str]) -> list[str]:
         """
-        Apply any glob placeholders in the command string
+        Apply any placeholders replacements in the command string
         :param command: Command to process
         :return: Updated command record
         """
@@ -529,7 +658,19 @@ class CommandTest(BasicTest):
             if item.startswith(self.COMMAND_OPTION_PREFIX_GLOB):
                 item = item[len(self.COMMAND_OPTION_PREFIX_GLOB):]
                 matches = glob.glob(item)
-                s = os.getcwd()
+                result += matches
+            elif item.startswith(self.COMMAND_OPTION_PREFIX_STORAGE):
+                key = item[len(self.COMMAND_OPTION_PREFIX_STORAGE):]
+                if key.startswith(self.COMMAND_OPTION_PREFIX_PATTERN):
+                    key = key[len(self.COMMAND_OPTION_PREFIX_PATTERN):]
+                    pattern, key = key.split(":", 1)
+                else:
+                    pattern = None
+
+                matches = utils.ensure_list(self.storage.get(key, []))
+                if pattern:
+                    matches = list(map(lambda x: pattern.format(item=x), matches))
+
                 result += matches
             else:
                 result.append(item)
@@ -542,7 +683,15 @@ class CommandTest(BasicTest):
         :param command: Configuration supplied command string
         :return: Fixed command string
         """
-        return self._apply_glob(command)
+        return self._apply_replacements(command)
+
+    @staticmethod
+    def set_working_directory(directory: str):
+        """
+        Set the working directory of the command
+        :param directory: Desired working directory
+        """
+        os.chdir(directory)
 
     def run(self, result: TestStepResult):
         """
@@ -553,10 +702,14 @@ class CommandTest(BasicTest):
 
         result.successful = True
         pid = 0
+        cwd = os.getcwd()
         try:
             command = self.prepare_command(self.command)
             if self.options.get('show_command', True):
                 result.additional_records.append(('Kommandozeile', self.command_invocation))
+
+            if self.options.get('working_directory'):
+                self.set_working_directory(self.options['working_directory'])
 
             timeout = None if self.timeout is None or self.timeout < 0 else self.timeout
             input_data = self.options.get('input', None)
@@ -628,12 +781,13 @@ class DockerCommandTest(CommandTest):
     """
     TYPE = "docker"
 
-    def __init__(self, options):
+    def __init__(self, options, storage: TestStorage):
         """
         Init a command execution based test with options
         :param options: Test configuration options - supported parameters besides CommandTest-options are:
             image: str - Name of the docker image to run
             repo_volume_path: str - Path where to mount to repository volume to the container (Defaults to repo)
+        :param storage: Test interchange storage
         """
         if 'image' not in options:
             raise Exception("Docker image must be supplied for the test")
@@ -645,7 +799,7 @@ class DockerCommandTest(CommandTest):
         if 'command' not in options:
             options['command'] = []
 
-        super(DockerCommandTest, self).__init__(options)
+        super(DockerCommandTest, self).__init__(options, storage)
 
     def prepare_command(self, command: list[str]) -> list[str]:
         """
@@ -655,14 +809,28 @@ class DockerCommandTest(CommandTest):
         """
         # Build basic docker command
         volume = f".:{self.volume}"
-        command = ['docker', 'run', '-i', '--name', self.container_name, '--rm', '--network=none', '-v', volume,
-                   self.options['image']]
+        command = ['docker', 'run', '-i', '--name', self.container_name, '--rm', '--network=none', '-v', volume ]
+
+        if self.options.get('working_directory'):
+            command += [ '-w', self.options['working_directory'] ]
+
+        # Append image to start
+        command.append(self.options['image'])
 
         # If a special command is given use this instead of the container command
         if len(self.options.get('command', [])) > 0:
             command += super(DockerCommandTest, self).prepare_command(self.options['command'])
 
         return command
+
+    @staticmethod
+    def set_working_directory(directory: str):
+        """
+        Set the working directory of the command
+        :param directory: Desired working directory
+        """
+        # Working directory is set through command line options
+        pass
 
     def kill(self, pid):
         subprocess.run(['docker', 'kill', '-s', '9', self.container_name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

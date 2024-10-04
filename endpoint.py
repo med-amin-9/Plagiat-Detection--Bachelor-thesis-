@@ -223,6 +223,20 @@ class GitlabEndpoint(Endpoint):
         repo = git.Repo(repository.path)
         repo.git.reset('--hard', 'origin/HEAD')
 
+        untracked_file_directories = set()
+        for file in repo.untracked_files:
+            p = os.path.join(repo.working_dir, file)
+            os.remove(p)
+            untracked_file_directories.add(os.path.dirname(file))
+
+        for directory in untracked_file_directories:
+            if not directory:
+                continue
+
+            p = os.path.join(repo.working_dir, directory)
+            if os.path.isdir(p) and len(os.listdir(p)) == 0:
+                os.rmdir(p)
+
         # Update content
         for remote in repo.remotes:
             self.logger.debug(f"Fetch and pull from remote {remote.name}")
