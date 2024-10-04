@@ -349,7 +349,7 @@ class GitlabEndpoint(Endpoint):
         Indicator if this endpoint supports unzipping content
         :return: True if the endpoint supports unzipping content
         """
-        return True
+        return False
 
 
 class MoodleEndpoint(Endpoint):
