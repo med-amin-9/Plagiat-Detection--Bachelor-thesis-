@@ -69,7 +69,7 @@ class ExerciseTester(object):
         self.logger.info(f"Run tests in base directory {path}")
 
         # Check if execution is requested now
-        now = datetime.datetime.now()
+        now = datetime.datetime.now().timestamp()
         if self.config['general']['valid_until']:
             valid_until = self.config['general']['valid_until']
             if now > valid_until:
