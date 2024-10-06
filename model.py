@@ -579,7 +579,7 @@ class FileTest(BasicTest):
                         sha1.update(data)
 
                 h = sha1.hexdigest()
-                success = desired_hash != h
+                success = desired_hash == h
                 result.test_items.append((message, success))
                 result.successful &= success
                 if success:
