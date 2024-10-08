@@ -66,7 +66,7 @@ class ExerciseTester(object):
         configured docker containers
         """
         path = self.working_directory
-        self.logger.info(f"Run tests in base directory {path}")
+        self.logger.debug(f"Run tests in base directory {path}")
 
         # Check if execution is requested now
         now = datetime.datetime.now().timestamp()
@@ -128,7 +128,7 @@ class ExerciseTester(object):
         for test_config in self.config['tests']:
             self.tests.append(model.BasicTest.from_configuration(test_config, self.storage))
 
-        self.logger.info(f'Read {len(self.tests)} tests')
+        self.logger.debug(f'Read {len(self.tests)} tests')
         max_points = sum(map(lambda t: t.points, self.tests))
         auto_points_tests = list(filter(lambda t: t.has_auto_points, self.tests))
         if len(auto_points_tests) > 0:
