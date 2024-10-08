@@ -140,7 +140,7 @@ class ExerciseTester(object):
             points_per_test = difference // len(auto_points_tests)
             for index, test in enumerate(auto_points_tests):
                 if index == len(auto_points_tests) - 1:
-                    test.update_points(100 - (max_points + (len(auto_points_tests) - 1) * points_per_test));
+                    test.update_points(100 - (max_points + (len(auto_points_tests) - 1) * points_per_test))
                 else:
                     test.update_points(points_per_test)
 
