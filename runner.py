@@ -1,6 +1,7 @@
 import toml
 import sys
 import os
+import logging
 
 from toml import TomlDecodeError
 
@@ -30,11 +31,11 @@ if __name__ == "__main__":
     for configuration_path in get_configuration_paths():
         if os.path.isfile(configuration_path):
             try:
-                print(f"Loading configuration from {configuration_path}")
+                logging.debug(f"Loading configuration from {configuration_path}")
                 config = toml.load(configuration_path)
                 configs.append(config)
             except TomlDecodeError as tde:
-                print("File %s is not a valid toml: %s" %(configuration_path, tde.msg))
+                logging.error("File %s is not a valid toml: %s" %(configuration_path, tde.msg))
                 sys.exit(1)
 
     tester = ExerciseTester(configs)
