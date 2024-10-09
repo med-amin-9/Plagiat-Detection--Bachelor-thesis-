@@ -4,6 +4,7 @@ import logging
 import os.path
 import sys
 import datetime
+from zipfile import BadZipfile
 
 import model
 import utils
@@ -91,11 +92,15 @@ class ExerciseTester(object):
                 if self.config['general']['unzip_submissions'] and repo.supports_unzip:
                     try:
                         repo.unzip(self.config['general']['remove_archive_after_unzip'])
-                    except Exception as e:
+                    except BadZipfile:
                         repo.submit_grade(0, "Abgabe ist keine gültige ZIP-Datei")
 
                 self.logger.debug(f"Repository {repo} was updated - perform a test")
-                result = self._run_test(repo)
+                try:
+                    result = self._run_test(repo)
+                except Exception as e:
+                    repo.submit_grade(0, f"Auswertung der Abgabe ist abgestürzt: {e}")
+                    continue
 
                 if not self.config['general']['simulate']:
                     self.logger.debug(f"Submit grading {result.grade} for {repo}")

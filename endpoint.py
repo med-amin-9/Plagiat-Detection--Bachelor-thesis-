@@ -454,7 +454,9 @@ class MoodleEndpoint(Endpoint):
         assignment = module_submissions["assignments"][0]
         result = []
         for submission in assignment.get("submissions", []):
-            if submission.get("status") == "new":
+            submission_status = submission.get("status")
+            if submission_status != "submitted":
+                self.logger.debug(f"Skip Submission as it is not in submitted state but in state {submission_status}")
                 continue
 
             data = {
