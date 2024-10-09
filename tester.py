@@ -89,7 +89,10 @@ class ExerciseTester(object):
             if self.config['general']['always_run_tests'] or repo.has_update():
                 # Check if we should unzip the content
                 if self.config['general']['unzip_submissions'] and repo.supports_unzip:
-                    repo.unzip(self.config['general']['remove_archive_after_unzip'])
+                    try:
+                        repo.unzip(self.config['general']['remove_archive_after_unzip'])
+                    except Exception as e:
+                        repo.submit_grade(0, "Abgabe ist keine gültige ZIP-Datei")
 
                 self.logger.debug(f"Repository {repo} was updated - perform a test")
                 result = self._run_test(repo)

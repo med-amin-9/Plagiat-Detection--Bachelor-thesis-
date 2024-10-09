@@ -1,4 +1,5 @@
 import typing
+import zipfile
 from zipfile import ZipFile
 
 import markdown
@@ -566,6 +567,7 @@ class MoodleEndpoint(Endpoint):
             directory = os.path.normpath(repository.path + file.get('filepath'))
             zip_file_path = directory + os.path.sep + file.get('filename')
             zip_file = ZipFile(zip_file_path)
+
             members = []
             for member in zip_file.filelist:
                 if not member.filename.startswith("__") and not member.filename.startswith(".") and not member.is_dir():
