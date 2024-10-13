@@ -11,6 +11,7 @@ import git
 import re
 import shutil
 from furl import furl
+from git import GitCommandError
 
 import utils
 import config
@@ -205,7 +206,12 @@ class GitlabEndpoint(Endpoint):
         """
         self.logger.debug(f"Fetching repository {repository.identifier}")
         if os.path.exists(repository.path):
-            self._pull(repository)
+            try:
+                self._pull(repository)
+            except GitCommandError as gce:
+                self.logger.warning(f"Pull of repository did fail with {gce}. Will try a fresh clone and remove {repository.path}")
+                shutil.rmtree(repository.path)
+                self._clone(repository)
         else:
             self._clone(repository)
 
