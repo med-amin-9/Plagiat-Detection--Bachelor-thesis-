@@ -39,6 +39,7 @@ if __name__ == "__main__":
                 sys.exit(1)
 
     tester = ExerciseTester(configs)
-    tester.run()
+    if tester.test():
+        tester.run()
 
 

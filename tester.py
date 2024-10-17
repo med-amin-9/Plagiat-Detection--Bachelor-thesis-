@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os.path
+import subprocess
 import sys
 import datetime
 from zipfile import BadZipfile
@@ -60,6 +61,29 @@ class ExerciseTester(object):
     def working_directory(self):
         d = self.config['general']['directory']
         return os.path.abspath(d)
+
+    def test(self) -> bool:
+        """
+        Perform some self-service checks if testing is available
+        :return: true if testing can start, else false
+        """
+        # We need at least one endpoint
+        factory = EndpointFactory.get()
+        if factory.get_endpoint('gitlab') is None and factory.get_endpoint('moodle') is None and \
+            factory.get_endpoint('local') is None:
+            self.logger.error("No endpoints available to read data")
+            return False
+
+        # Validate docker availability
+        docker_command = ['docker', 'info']
+        try:
+            result = subprocess.run(docker_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            result.check_returncode()
+        except subprocess.CalledProcessError as cpe:
+            self.logger.error(f"Failed to test docker availability with {cpe}")
+            return False
+
+        return True
 
     def run(self) -> None:
         """

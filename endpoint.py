@@ -366,6 +366,7 @@ class MoodleEndpoint(Endpoint):
 
     ASSIGNMENT_TYPE = "assign"
     FILE_PLUGIN_TYPE = "file"
+    ACCEPTED_SUBMISSION_STATUS = ["submitted", "reopened"]
 
     def __init__(self, configuration: dict[str, typing.Any]) -> None:
         """
@@ -461,8 +462,14 @@ class MoodleEndpoint(Endpoint):
         result = []
         for submission in assignment.get("submissions", []):
             submission_status = submission.get("status")
-            if submission_status != "submitted":
-                self.logger.debug(f"Skip Submission as it is not in submitted state but in state {submission_status}")
+            if submission_status not in self.ACCEPTED_SUBMISSION_STATUS:
+                self.logger.debug(f"Skip Submission as it is not in recognized state but in state {submission_status}")
+                continue
+
+            # Check if there are files in the submission
+            files = self._get_files(submission)
+            if len(files) == 0:
+                self.logger.debug(f"Skip Submission as it does not contain any files")
                 continue
 
             data = {
