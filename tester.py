@@ -108,32 +108,46 @@ class ExerciseTester(object):
                 return
 
         for repo in self.repositories:
-            self.logger.debug(f"Fetching repository {repo}")
-            repo.download()
+            if repo.is_locked():
+                self.logger.warning(f"Repository {repo} already locked - Skipping test")
+                continue
 
-            if self.config['general']['always_run_tests'] or repo.has_update():
-                # Check if we should unzip the content
-                if self.config['general']['unzip_submissions'] and repo.supports_unzip:
+            try:
+                # Lock repo for processing
+                repo.lock()
+
+                self.logger.debug(f"Fetching repository {repo}")
+                repo.download()
+
+                if self.config['general']['always_run_tests'] or repo.has_update():
+                    # Check if we should unzip the content
+                    if self.config['general']['unzip_submissions'] and repo.supports_unzip:
+                        try:
+                            repo.unzip(self.config['general']['remove_archive_after_unzip'])
+                        except BadZipfile:
+                            repo.submit_grade(0, "Abgabe ist keine gültige ZIP-Datei")
+
+                    self.logger.debug(f"Repository {repo} was updated - perform a test")
                     try:
-                        repo.unzip(self.config['general']['remove_archive_after_unzip'])
-                    except BadZipfile:
-                        repo.submit_grade(0, "Abgabe ist keine gültige ZIP-Datei")
+                        result = self._run_test(repo)
+                    except Exception as e:
+                        repo.submit_grade(0, f"Auswertung der Abgabe ist abgestürzt: {e}")
+                        continue
 
-                self.logger.debug(f"Repository {repo} was updated - perform a test")
-                try:
-                    result = self._run_test(repo)
-                except Exception as e:
-                    repo.submit_grade(0, f"Auswertung der Abgabe ist abgestürzt: {e}")
-                    continue
-
-                if not self.config['general']['simulate']:
-                    self.logger.debug(f"Submit grading {result.grade} for {repo}")
-                    repo.submit_grade(result.grade, result.message)
+                    if not self.config['general']['simulate']:
+                        self.logger.debug(f"Submit grading {result.grade} for {repo}")
+                        repo.submit_grade(result.grade, result.message)
+                    else:
+                        self.logger.debug(f"Simulated Grading {result.grade} for {repo}")
+                        self.logger.debug(f"Grading message {result.message}")
                 else:
-                    self.logger.debug(f"Simulated Grading {result.grade} for {repo}")
-                    self.logger.debug(f"Grading message {result.message}")
-            else:
-                self.logger.debug(f"{repo} has no updates - skipping")
+                    self.logger.debug(f"{repo} has no updates - skipping")
+            except Exception as e:
+                self.logger.warning(f"Failed to execute test for repository {repo} with error {e}")
+
+            finally:
+                # Free repo lock
+                repo.unlock()
 
     def _read_test_config(self) -> None:
         """

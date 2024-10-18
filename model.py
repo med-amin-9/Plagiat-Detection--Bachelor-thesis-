@@ -4,6 +4,7 @@ import hashlib
 import os
 import random
 import re
+import signal
 import string
 import subprocess
 import tempfile
@@ -41,6 +42,42 @@ class Repository(object):
     def has_update(self) -> bool:
         return self._endpoint.has_update(self)
 
+    def is_locked(self, consider_own_pid_locked = True) -> bool:
+        """
+        Test if this repository is locked
+        This check return true if a lock file is present, and evaluate the stored PID
+        the pid of this process
+        :param consider_own_pid_locked: Set to True if you want to consider to repo locked even if the current PID holds the lock
+        :return: True if locked else false
+        """
+        if not os.path.isfile(self.lock_path):
+            return False
+
+        pid = os.getpid()
+        locked_pid = open(self.lock_path, "r").read()
+        return locked_pid.isdigit() and (consider_own_pid_locked or pid != int(locked_pid))
+
+    def lock(self):
+        """
+        Create a new lock file for this repository
+        """
+        if self.is_locked(False):
+            raise Exception("Repository is already locked")
+
+        pid = os.getpid()
+        with open(self.lock_path, "w") as fd:
+            fd.write(str(pid))
+
+    def unlock(self, force = False):
+        """
+        Unlock this repository
+        """
+        if self.is_locked(False) and not force:
+            raise Exception("Repository is already locked by another process - your not allowed to remove this lock")
+
+        if os.path.isfile(self.lock_path):
+            os.remove(self.lock_path)
+
     def unzip(self, remove_archive: bool):
         return self._endpoint.unzip(self, remove_archive)
 
@@ -73,6 +110,10 @@ class Repository(object):
     @property
     def metadata_path(self):
         return f'{self.working_directory}/repo_{self.identifier}_meta.toml'
+
+    @property
+    def lock_path(self):
+        return f'{self.working_directory}/repo_{self.identifier}.lock'
 
     @property
     def metadata(self):
@@ -626,8 +667,10 @@ class CommandTest(BasicTest):
             input: str - Input to provide to the command
             output: str - Regular expression of required output (optional) - this is tested with re.search
             output_match: str - Regular expression of required output (optional) - this is tested with re.match
+            output_max_length: int - Maximum number of characters for the output (Default 256 kB)
             error: str - Regular expression of required error output (optional) - this is tested with re.search
             error_match: str - Regular expression of required error output (optional) - this is tested with re.match
+            error_max_length: int - Maximum number of characters for the output (Default 256 kB)
         :param storage: Test interchange storage
         """
         super(CommandTest, self).__init__(options, storage)
@@ -637,6 +680,8 @@ class CommandTest(BasicTest):
 
         self.timeout = self.options.get('timeout', -1)
         self.command = utils.ensure_list(options['command'])
+        self.output_max_length = self.options.get('output_max_length', 256 * 1024)
+        self.error_max_length = self.options.get('error_max_length', 256 * 1024)
 
     @property
     def command_invocation(self) -> str:
@@ -702,7 +747,6 @@ class CommandTest(BasicTest):
 
         result.successful = True
         pid = 0
-        cwd = os.getcwd()
         try:
             command = self.prepare_command(self.command)
             if self.options.get('show_command', True):
@@ -754,8 +798,8 @@ class CommandTest(BasicTest):
                 result.successful &= success
 
         except subprocess.TimeoutExpired as e:
-            result.output = e.stdout.decode('utf-8') if e.stdout is not None else ''
-            result.error = e.stderr.decode('utf-8') if e.stderr is not None else ''
+            result.output = e.stdout.decode('utf-8', errors='ignore') if e.stdout is not None else ''
+            result.error = e.stderr.decode('utf-8', errors='ignore') if e.stderr is not None else ''
             result.error += "\nAbbruch nach Überschreitung des Zeitlimits"
             result.successful = False
             self.kill(pid)
@@ -766,6 +810,13 @@ class CommandTest(BasicTest):
             result.error += "\nAbbruch nach Fehler beim Aufruf des Befehls"
             result.successful = False
             self.kill(pid)
+
+        finally:
+            if len(result.output) > self.output_max_length:
+                result.output = result.output[:self.output_max_length] + "<TRUNCATED>"
+
+            if len(result.error) > self.error_max_length:
+                result.error = result.error[:self.error_max_length] + "<TRUNCATED>"
 
     def kill(self, pid):
         """
@@ -833,4 +884,6 @@ class DockerCommandTest(CommandTest):
         pass
 
     def kill(self, pid):
+        os.kill(pid, signal.SIGKILL)
+        subprocess.run(['docker', 'pause', self.container_name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         subprocess.run(['docker', 'kill', '-s', '9', self.container_name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
