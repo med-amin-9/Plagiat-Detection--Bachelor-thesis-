@@ -279,11 +279,11 @@ class GitlabEndpoint(Endpoint):
         last_feedback = GitlabEndpoint._get_last_feedback_with_marker(repo, last_feedback_marker)
 
         if last_request is None:
-            self.logger.info(f"No check request found for repo at {repository.identifier}.")
+            self.logger.debug(f"No check request found for repo at {repository.identifier}.")
             return False
 
         elif last_feedback is not None and last_feedback.committed_datetime > last_request.committed_datetime:
-            self.logger.info(f"Feedback commit already present for repo at {repository.identifier}.")
+            self.logger.debug(f"Feedback commit already present for repo at {repository.identifier}.")
             return False
 
         else:
