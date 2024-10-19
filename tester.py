@@ -92,6 +92,7 @@ class ExerciseTester(object):
         """
         path = self.working_directory
         self.logger.debug(f"Run tests in base directory {path}")
+        os.makedirs(path, exist_ok=True)
 
         # Check if execution is requested now
         now = datetime.datetime.now().timestamp()

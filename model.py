@@ -573,7 +573,7 @@ class FileTest(BasicTest):
             try:
                 with open(item, 'r') as fd:
                     content = fd.read()
-                    success = re.search(desired_content, content) is not None
+                    success = re.search(desired_content, content, re.MULTILINE) is not None
 
                 result.test_items.append((message, success))
                 result.successful &= success
@@ -783,7 +783,7 @@ class CommandTest(BasicTest):
                 ('error_match', 'Fehler-Ausgabe passt auf', 'Fehler-Ausgabe ist korrekt', result.error, re.match)
             ]:
                 if self.options.get(key, None) is not None:
-                    success = f(self.options[key], target) is not None
+                    success = f(self.options[key], target, re.MULTILINE) is not None
                     if self.options.get('show_expected_output', False):
                         result.test_items.append((f'{title_public} `{self.options[key]}`', success))
                     else:
