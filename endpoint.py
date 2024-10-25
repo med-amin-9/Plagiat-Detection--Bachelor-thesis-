@@ -45,6 +45,14 @@ class Endpoint(object):
         """
         pass
 
+    def get_current_grade(self, repository: model.Repository):
+        """
+        Return the current grade of the repository
+        :param repository: Repository to return the last grading for
+        :return: Grading as a float number or None if no last grading could be found
+        """
+        return None
+
 
 class LocalEndpoint(Endpoint):
     """
@@ -366,7 +374,8 @@ class MoodleEndpoint(Endpoint):
 
     ASSIGNMENT_TYPE = "assign"
     FILE_PLUGIN_TYPE = "file"
-    ACCEPTED_SUBMISSION_STATUS = ["submitted", "reopened"]
+    ACCEPTED_SUBMISSION_STATUS = ["submitted"]
+    REOPENED_SUBMISSION_STATUS = ["reopened"]
 
     def __init__(self, configuration: dict[str, typing.Any]) -> None:
         """
@@ -412,6 +421,22 @@ class MoodleEndpoint(Endpoint):
         :return: True if the endpoint supports unzipping content
         """
         return True
+
+    def get_current_grade(self, repository: model.Repository):
+        """
+        Return the current grade of the repository
+        :param repository: Repository to return the last grading for
+        :return: Grading as a float number or None if no last grading could be found
+        """
+        try:
+            submission = repository.data['submission']
+            status = submission.get('gradingstatus', 'notgraded')
+            if status == 'graded' and submission.get('grade') is not None:
+                return float(submission.get('grade', '0'))
+        except ValueError:
+            pass
+
+        return None
 
     def validate_configuration(self) -> None:
         assert self.configuration['uri'] is not None
@@ -462,9 +487,47 @@ class MoodleEndpoint(Endpoint):
         result = []
         for submission in assignment.get("submissions", []):
             submission_status = submission.get("status")
-            if submission_status not in self.ACCEPTED_SUBMISSION_STATUS:
+            userid = submission.get("userid")
+            if (self.configuration.get("use_previous_attempt_for_reopened_submissions", False) and
+                    submission_status in self.REOPENED_SUBMISSION_STATUS):
+                self.logger.debug(f"Submission {submission.get('id')} is reopened. Search last submitted one.")
+
+                user_submissions = self._call('GET', 'mod_assign_get_submission_status',
+                                              {'userid': userid, 'assignid': assignment_id})
+
+                attempts = filter(lambda x: x.get('submission', {}).get('status') in self.ACCEPTED_SUBMISSION_STATUS,
+                                  user_submissions.get("previousattempts", []))
+                try:
+                    attempt = max(attempts, key=lambda x: x.get('attemptnumber'))
+                    submission = attempt.get('submission')
+                    self.logger.debug(f"Selected last submitted submission {submission.get('id')}.")
+                except ValueError:
+                    self.logger.debug(f"No other submitted attempt found")
+                    continue
+
+                try:
+                    grading = attempt.get('grade')
+                    if grading is not None and grading.get('grade') is not None:
+                        submission['gradingstatus'] = 'graded'
+                        submission['grade'] = float(grading['grade'])
+                except ValueError:
+                    self.logger.debug(f"No grade for submission found")
+                    submission['gradingstatus'] = 'notgraded'
+
+            elif submission_status not in self.ACCEPTED_SUBMISSION_STATUS:
                 self.logger.debug(f"Skip Submission as it is not in recognized state but in state {submission_status}")
                 continue
+
+            else:
+                # try to find up to date grading
+                user_submissions = self._call('GET', 'mod_assign_get_submission_status',
+                                              {'userid': userid, 'assignid': assignment_id})
+                grade = user_submissions.get('feedback', {}).get('grade', {}).get('grade', {})
+                try:
+                    submission['grade'] = float(grade)
+                except ValueError:
+                    self.logger.debug(f"Failed to read grade for already graded submission")
+                    submission['grade'] = False
 
             # Check if there are files in the submission
             files = self._get_files(submission)

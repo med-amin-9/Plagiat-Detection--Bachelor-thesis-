@@ -120,7 +120,8 @@ class ExerciseTester(object):
                 self.logger.debug(f"Fetching repository {repo}")
                 repo.download()
 
-                if self.config['general']['always_run_tests'] or repo.has_update():
+                always_run_tests = self.config['general']['always_run_tests']
+                if always_run_tests is not False or repo.has_update():
                     # Check if we should unzip the content
                     if self.config['general']['unzip_submissions'] and repo.supports_unzip:
                         try:
@@ -135,12 +136,21 @@ class ExerciseTester(object):
                         repo.submit_grade(0, f"Auswertung der Abgabe ist abgestürzt: {e}")
                         continue
 
-                    if not self.config['general']['simulate']:
-                        self.logger.debug(f"Submit grading {result.grade} for {repo}")
-                        repo.submit_grade(result.grade, result.message)
-                    else:
-                        self.logger.debug(f"Simulated Grading {result.grade} for {repo}")
+                    grade_updated = repo.current_grade != False and \
+                                    (repo.current_grade is None or repo.current_grade < result.grade)
+                    if self.config['general']['simulate']:
+                        if grade_updated:
+                            self.logger.debug(f"Simulated UPDATED Grading {result.grade} for {repo}")
+                        else:
+                            self.logger.debug(f"Simulation resulted in same grading {result.grade} for {repo}")
                         self.logger.debug(f"Grading message {result.message}")
+                    #elif always_run_tests is True or repo.current_grade is None or repo.current_grade != result.grade:
+                    else:
+                        if grade_updated:
+                            self.logger.debug(f"Submit UPDATED Grading {result.grade} for {repo}")
+                            repo.submit_grade(result.grade, result.message)
+                        else:
+                            self.logger.debug(f"Skip grade submission because of same grading {result.grade} for {repo}")
                 else:
                     self.logger.debug(f"{repo} has no updates - skipping")
             except Exception as e:

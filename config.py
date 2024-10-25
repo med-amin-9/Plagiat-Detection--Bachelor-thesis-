@@ -37,6 +37,7 @@ DEFAULT_CONFIGURATION = {
         'username': None,  # Username to use for authentication at the moodle instance
         'password': None,  # Password to use for username
         'service': 'moodle_mobile_app',  # Name of the service to use when fetching auth tokens
+        'use_previous_attempt_for_reopened_submissions': True
     },
 
     'logging': {

@@ -36,6 +36,10 @@ class Repository(object):
         self.working_directory = tempfile.gettempdir()
         self._metadata = None
 
+    @property
+    def current_grade(self):
+        return self._endpoint.get_current_grade(self)
+
     def download(self):
         self._endpoint.download(self)
 
