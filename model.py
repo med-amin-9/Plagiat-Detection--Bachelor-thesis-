@@ -661,6 +661,8 @@ class CommandTest(BasicTest):
     COMMAND_OPTION_PREFIX_STORAGE = "__storage:"
     COMMAND_OPTION_PREFIX_PATTERN = "__pattern:"
 
+    DEFAULT_TIMEOUT = 60
+
     def __init__(self, options, storage: TestStorage):
         """
         Init a command execution based test with options
@@ -759,7 +761,7 @@ class CommandTest(BasicTest):
             if self.options.get('working_directory'):
                 self.set_working_directory(self.options['working_directory'])
 
-            timeout = None if self.timeout is None or self.timeout < 0 else self.timeout
+            timeout = self.DEFAULT_TIMEOUT if self.timeout is None or self.timeout < 0 else self.timeout
             input_data = self.options.get('input', None)
             process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                        stdin=subprocess.PIPE, text=True)
