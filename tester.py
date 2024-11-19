@@ -165,11 +165,12 @@ class ExerciseTester(object):
         Test the application test config and bail out on invalid setup parameters
         :return: None
         """
+        self.storage = TestStorage()
         self.preconditions = []
         if self.config.get('preconditions') is not None:
             self.logger.debug('Read test preconditions setup')
             for test_config in self.config['preconditions']:
-                self.preconditions.append(model.BasicTest.from_configuration(test_config))
+                self.preconditions.append(model.BasicTest.from_configuration(test_config, self.storage))
 
             self.logger.debug(f'Read {len(self.preconditions)} test preconditions')
         else:
@@ -180,7 +181,6 @@ class ExerciseTester(object):
             raise Exception("No test configuration specified")
 
         self.tests = []
-        self.storage = TestStorage()
         self.logger.debug('Read tests')
         for test_config in self.config['tests']:
             self.tests.append(model.BasicTest.from_configuration(test_config, self.storage))
