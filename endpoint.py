@@ -53,6 +53,14 @@ class Endpoint(object):
         """
         return None
 
+    @staticmethod
+    def require_download_before_update_check() -> bool:
+        """
+        Check if the repository must be downloaded via the endpoint before an update can be checked
+        :return: true if the repository requires download before an update check can be performed
+        """
+        return False
+
 
 class LocalEndpoint(Endpoint):
     """
@@ -142,6 +150,10 @@ class GitlabEndpoint(Endpoint):
 
     def validate_configuration(self) -> None:
         assert self.configuration['uri'] is not None
+
+    @staticmethod
+    def require_download_before_update_check() -> bool:
+        return True
 
     def get_repositories_by_forks(self, project_name: str) -> list[model.Repository]:
         """

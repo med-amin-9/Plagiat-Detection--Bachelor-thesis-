@@ -109,6 +109,9 @@ class ExerciseTester(object):
                 return
 
         for repo in self.repositories:
+            if self.config['general']['repo_filter'] and repo.identifier not in self.config['general']['repo_filter']:
+                self.logger.info(f"Skipping because Repo {repo} not in filter list")
+
             if repo.is_locked():
                 self.logger.warning(f"Repository {repo} already locked - Skipping test")
                 continue
@@ -117,11 +120,17 @@ class ExerciseTester(object):
                 # Lock repo for processing
                 repo.lock()
 
-                self.logger.debug(f"Fetching repository {repo}")
-                repo.download()
+                if repo.endpoint.require_download_before_update_check():
+                    self.logger.debug(f"Fetching repository {repo}")
+                    repo.download()
 
                 always_run_tests = self.config['general']['always_run_tests']
                 if always_run_tests is not False or repo.has_update():
+
+                    if not repo.endpoint.require_download_before_update_check():
+                        self.logger.debug(f"Late fetching repository {repo}")
+                        repo.download()
+
                     # Check if we should unzip the content
                     if self.config['general']['unzip_submissions'] and repo.supports_unzip:
                         try:
