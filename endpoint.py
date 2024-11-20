@@ -522,7 +522,7 @@ class MoodleEndpoint(Endpoint):
                 # try to find up to date grading
                 user_submissions = self._call('GET', 'mod_assign_get_submission_status',
                                               {'userid': userid, 'assignid': assignment_id})
-                grade = user_submissions.get('feedback', {}).get('grade', {}).get('grade', {})
+                grade = user_submissions.get('feedback', {}).get('grade', {}).get('grade', 0)
                 try:
                     submission['grade'] = float(grade)
                 except ValueError:
