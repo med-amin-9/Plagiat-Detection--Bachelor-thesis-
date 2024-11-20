@@ -111,6 +111,7 @@ class ExerciseTester(object):
         for repo in self.repositories:
             if self.config['general']['repo_filter'] and repo.identifier not in self.config['general']['repo_filter']:
                 self.logger.info(f"Skipping because Repo {repo} not in filter list")
+                continue
 
             if repo.is_locked():
                 self.logger.warning(f"Repository {repo} already locked - Skipping test")
