@@ -822,15 +822,15 @@ class CommandTest(BasicTest):
                 result.successful &= success
 
         except subprocess.TimeoutExpired as e:
-            result.output = e.stdout.decode('utf-8', errors='ignore') if e.stdout is not None else ''
-            result.error = e.stderr.decode('utf-8', errors='ignore') if e.stderr is not None else ''
+            result.output = CommandTest.filter_non_printable(e.stdout)
+            result.error = CommandTest.filter_non_printable(e.stderr)
             result.error += "\nAbbruch nach Überschreitung des Zeitlimits"
             result.successful = False
             self.kill(pid)
 
         except subprocess.CalledProcessError as e:
-            result.output = e.stdout if e.stdout is not None else ''
-            result.error = e.stderr if e.stderr is not None else ''
+            result.output = CommandTest.filter_non_printable(e.stdout)
+            result.error = CommandTest.filter_non_printable(e.stderr)
             result.error += "\nAbbruch nach Fehler beim Aufruf des Befehls"
             result.successful = False
             self.kill(pid)
