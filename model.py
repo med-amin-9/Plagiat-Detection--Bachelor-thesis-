@@ -1,6 +1,7 @@
 import datetime
 import glob
 import hashlib
+import itertools
 import os
 import random
 import re
@@ -663,6 +664,9 @@ class CommandTest(BasicTest):
 
     DEFAULT_TIMEOUT = 60
 
+    UNICODE_CHARS_REMOVE_STRING = ''.join(map(chr, itertools.chain(range(0x00, 0x09), range(0x0b, 0x20), range(0x7f, 0xa0))))
+    UNICODE_CHARS_REMOVE_EXPRESSION = re.compile('[%s]' % re.escape(UNICODE_CHARS_REMOVE_STRING))
+
     def __init__(self, options, storage: TestStorage):
         """
         Init a command execution based test with options
@@ -744,6 +748,20 @@ class CommandTest(BasicTest):
         """
         os.chdir(directory)
 
+    @staticmethod
+    def filter_non_printable(s):
+        """
+        Filter unicode output from unprintable strings
+        :param s: Input string or bytes
+        :return: Result string
+        """
+        if not s:
+            return ''
+        elif type(s) == bytes:
+            s = s.decode("utf-8", errors="ignore")
+
+        return CommandTest.UNICODE_CHARS_REMOVE_EXPRESSION.sub('', s)
+
     def run(self, result: TestStepResult):
         """
         Execute the test
@@ -764,21 +782,21 @@ class CommandTest(BasicTest):
             timeout = self.DEFAULT_TIMEOUT if self.timeout is None or self.timeout < 0 else self.timeout
             input_data = self.options.get('input', None)
             process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                       stdin=subprocess.PIPE, text=True)
+                                       stdin=subprocess.PIPE)
 
             pid = process.pid
             if input_data is not None:
                 if isinstance(input_data, str):
-                    process.stdin.write(input_data)
+                    process.stdin.write(input_data.encode('utf-8'))
                 else:
                     for input_config in input_data:
-                        process.stdin.write(input_config.get('data'))
+                        process.stdin.write(input_config.get('data').encode('utf-8'))
                         process.stdin.flush()
                         time.sleep(input_config.get('sleep', 0))
 
             output, error = process.communicate(timeout=timeout)
-            result.output = output if output is not None else ''
-            result.error = error if error is not None else ''
+            result.output = CommandTest.filter_non_printable(output)
+            result.error = CommandTest.filter_non_printable(error)
             result.return_code = process.returncode
 
             # Check desired output on all channels
