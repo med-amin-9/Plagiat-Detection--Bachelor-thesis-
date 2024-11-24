@@ -614,6 +614,7 @@ class FileTest(BasicTest):
         for index, item in enumerate(self.items):
             sha1 = hashlib.sha1()
             desired_hash = self.hashes[item] if isinstance(self.hashes, Mapping) else self.hashes[index]
+            desired_hash = utils.ensure_list(desired_hash)
             message = f'Hash-Test von {item} auf {desired_hash}'
             if os.path.exists(item) and os.path.isfile(item):
                 with open(item, 'rb') as f:
@@ -625,7 +626,7 @@ class FileTest(BasicTest):
                         sha1.update(data)
 
                 h = sha1.hexdigest()
-                success = desired_hash == h
+                success = h in desired_hash
                 result.test_items.append((message, success))
                 result.successful &= success
                 if success:
