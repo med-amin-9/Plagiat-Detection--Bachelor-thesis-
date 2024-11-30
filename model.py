@@ -692,7 +692,9 @@ class CommandTest(BasicTest):
         self.timeout = self.options.get('timeout', -1)
         self.command = utils.ensure_list(options['command'])
         self.output_max_length = self.options.get('output_max_length', 256 * 1024)
+        self.clear_output = self.options.get('clear_output', False)
         self.error_max_length = self.options.get('error_max_length', 256 * 1024)
+        self.clear_error = self.options.get('clear_error', False)
 
     @property
     def command_invocation(self) -> str:
@@ -842,6 +844,12 @@ class CommandTest(BasicTest):
 
             if len(result.error) > self.error_max_length:
                 result.error = result.error[:self.error_max_length] + "<TRUNCATED>"
+
+            if self.clear_output:
+                result.output = "<AUSGABE WIRD NICHT ANGEZEIGT>"
+
+            if self.clear_error:
+                result.error = "<FEHLER-AUSGABE WIRD NICHT ANGEZEIGT>"
 
     def kill(self, pid):
         """
