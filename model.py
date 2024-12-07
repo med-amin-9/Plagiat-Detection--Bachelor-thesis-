@@ -315,6 +315,14 @@ class TestStepResult(object):
         if self.error:
             result += f'##### Fehlerausgabe\n\n```{self.error.strip()}\n```\n\n'
 
+        if not self.successful:
+            if self.state == TestStepResult.STATE_PREPARED:
+                result += (f'##### Hinweise zur Behebung des Fehlers\n\nDer Test wurde nicht ausgeführt, da '
+                           f'vorherige Tests fehlgeschlagen sind. Beheben Sie die vorherigen Probleme und '
+                           f'versuchen Sie es dann erneut.\n\n')
+            elif self.test.failure_hint:
+                result += f'##### Hinweise zur Behebung des Fehlers\n\n{self.test.failure_hint}\n\n'
+
         return result
 
 
@@ -395,6 +403,10 @@ class BasicTest(object):
     @property
     def has_auto_points(self):
         return self.options.get('points') == 'auto'
+
+    @property
+    def failure_hint(self):
+        return self.options.get('failure_hint', None)
 
     def update_points(self, p):
         self.options['points'] = p

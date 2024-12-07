@@ -706,7 +706,9 @@ class MoodleEndpoint(Endpoint):
         # Publish the results
         assignment_id = repository.data['assignment'].get('assignmentid')
         user_id = repository.data['submission'].get('userid')
-        attempt = repository.data['submission'].get('attemptnumber', -1)
+        # attempt = repository.data['submission'].get('attemptnumber', -1)
+        attempt = -1
+        add_attempt = False
 
         html_message = markdown.markdown(message)
         params = {
@@ -714,7 +716,7 @@ class MoodleEndpoint(Endpoint):
             "userid": user_id,
             "attemptnumber": attempt,
             "grade": grade,
-            "addattempt": "1",
+            "addattempt": "1" if add_attempt else "0",
             "workflowstate": "graded",
             "applytoall": "0",
             "plugindata[assignfeedbackcomments_editor][text]": html_message,
