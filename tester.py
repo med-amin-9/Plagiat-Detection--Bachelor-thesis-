@@ -18,10 +18,11 @@ from collections.abc import Mapping
 
 class ExerciseTester(object):
 
-    def __init__(self, config):
+    def __init__(self, config, environment = 'prod'):
         """
         Create a new exercise tester and supply the application configuration
         :param config: The configuration passed by the user (may contain a list in decreasing order of priority)
+        :param environment: Runtime environment to use as optional suffix to configuration parameters
         """
         # Set default config as config parameters
         self.config = {}
@@ -34,11 +35,17 @@ class ExerciseTester(object):
                 if isinstance(self.config[key], Mapping):
                     for option in self.config[key]:
                         value = c.get(key, {}).get(option, None)
-                        if value is not None:
+                        environment_value = c.get(key, {}).get(f'{option}_{environment}', None)
+                        if environment_value is not None:
+                            self.config[key][option] = environment_value
+                        elif value is not None:
                             self.config[key][option] = value
                 else:
                     value = c.get(key, None)
-                    if value is not None:
+                    environment_value = c.get(f'{key}_{environment}', None)
+                    if environment_value is not None:
+                        self.config[key] = environment_value
+                    elif value is not None:
                         self.config[key] = value
 
         # Setup logging
