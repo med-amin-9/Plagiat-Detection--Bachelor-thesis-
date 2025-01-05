@@ -94,7 +94,7 @@ class LocalEndpoint(Endpoint):
         path = repository.data.get("path")
         for root, dirs, files in os.walk(path):
             sub_dir = root[len(path):]
-            destination_path = os.path.normpath(repository.path + "/" + sub_dir)
+            destination_path = os.path.normpath(repository.path + os.path.sep + sub_dir)
             os.makedirs(destination_path, exist_ok=True)
             for file in files:
                 shutil.copyfile(os.path.join(root, file), os.path.join(destination_path, file))
@@ -660,13 +660,18 @@ class MoodleEndpoint(Endpoint):
 
             members = []
             for member in zip_file.filelist:
-                if not member.filename.startswith("__") and not member.filename.startswith(".") and not member.is_dir():
+                # Skip directories - they are included by default
+                if member.is_dir():
+                    continue
+
+                parts = member.filename.split(os.path.sep)
+                if not any([x.startswith("__") or x.startswith(".") for x in parts]):
                     members.append(member)
 
             remove_toplevel_directory = False
             directories = set()
             for member in members:
-                dir_name = os.path.dirname(member.filename)
+                dir_name = member.filename.split(os.path.sep)[0]
                 directories.add(dir_name)
 
             # Check if only one directory was found and the found directory is not the empty string

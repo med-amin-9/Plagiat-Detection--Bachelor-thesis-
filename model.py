@@ -113,6 +113,17 @@ class Repository(object):
         return f'{self.working_directory}/repo_{self.identifier}'
 
     @property
+    def files(self):
+        result = []
+        p = self.path
+        for root, dirs, files in os.walk(p):
+            for f in files:
+                absolute_path = os.path.join(root, f)
+                result.append(os.path.relpath(absolute_path, p))
+
+        return result
+
+    @property
     def metadata_path(self):
         return f'{self.working_directory}/repo_{self.identifier}_meta.toml'
 

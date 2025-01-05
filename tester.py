@@ -1,73 +1,30 @@
 from __future__ import annotations
 
-import logging
 import os.path
 import subprocess
 import sys
 import datetime
 from zipfile import BadZipfile
 
+import config as config_module
 import model
-import utils
 from endpoint import EndpointFactory
-from config import DEFAULT_CONFIGURATION
 from model import TestStorage
-from source import Source
-from collections.abc import Mapping
 
 
-class ExerciseTester(object):
+class ExerciseTester(config_module.ConfigurationBasedObject):
 
-    def __init__(self, config, environment = 'prod'):
+    def __init__(self, config, environment='prod'):
         """
         Create a new exercise tester and supply the application configuration
         :param config: The configuration passed by the user (may contain a list in decreasing order of priority)
         :param environment: Runtime environment to use as optional suffix to configuration parameters
         """
         # Set default config as config parameters
-        self.config = {}
-        for key in DEFAULT_CONFIGURATION.keys():
-            self.config[key] = DEFAULT_CONFIGURATION[key].copy()
-
-        config = utils.ensure_list(config)
-        for c in config[::-1]:
-            for key in self.config:
-                if isinstance(self.config[key], Mapping):
-                    for option in self.config[key]:
-                        value = c.get(key, {}).get(option, None)
-                        environment_value = c.get(key, {}).get(f'{option}_{environment}', None)
-                        if environment_value is not None:
-                            self.config[key][option] = environment_value
-                        elif value is not None:
-                            self.config[key][option] = value
-                else:
-                    value = c.get(key, None)
-                    environment_value = c.get(f'{key}_{environment}', None)
-                    if environment_value is not None:
-                        self.config[key] = environment_value
-                    elif value is not None:
-                        self.config[key] = value
-
-        # Setup logging
-        logging.basicConfig()
-        self.logger = logging.getLogger()
-        self.logger.setLevel(self.config['logging']['level'])
+        super().__init__(config, environment)
 
         # Validate config
         self._read_test_config()
-
-        # Setup endpoints
-        EndpointFactory.get().register_endpoint('gitlab', EndpointFactory.TYPE_GITLAB, self.config.get('git'))
-        EndpointFactory.get().register_endpoint('moodle', EndpointFactory.TYPE_MOODLE, self.config.get('moodle'))
-        EndpointFactory.get().register_endpoint('local', EndpointFactory.TYPE_LOCAL, {})
-
-        # Fetch repos
-        self.repositories = self._fetch_targets()
-
-    @property
-    def working_directory(self):
-        d = self.config['general']['directory']
-        return os.path.abspath(d)
 
     def test(self) -> bool:
         """
@@ -102,9 +59,14 @@ class ExerciseTester(object):
         os.makedirs(path, exist_ok=True)
 
         # Check if execution is requested now
-        now = datetime.datetime.now().timestamp()
+        now = datetime.datetime.now()
         if self.config['general']['valid_until']:
             valid_until = self.config['general']['valid_until']
+            if type(valid_until) is str:
+                valid_until = datetime.datetime.strptime(valid_until, "%d.%m.%Y - %H:%M Uhr")
+            else:
+                valid_until = datetime.datetime.fromtimestamp(valid_until)
+
             if now > valid_until:
                 self.logger.info(f"Testing is disabled because now({now}) > valid_until({valid_until})")
                 return
@@ -276,23 +238,3 @@ class ExerciseTester(object):
         os.chdir(cwd)
 
         return result
-
-    def _fetch_targets(self) -> list[model.Repository]:
-        """
-        Fetches the list of repositories to process during execution
-        :return:
-        """
-        source_urls = utils.ensure_list(self.config['general']['repositories'])
-        if len(source_urls) == 0:
-            raise Exception("No repository sources configured in general->repositories")
-
-        d = self.config['general']['directory']
-        path = os.path.abspath(d)
-        submissions = []
-        for source_url in source_urls:
-            self.logger.debug(f"Processing source: {source_url}")
-            source = Source(source_url, path)
-            submissions += source.submissions
-
-        self.logger.debug(f"Found {len(submissions)} repositories: {submissions}")
-        return submissions

@@ -1,3 +1,12 @@
+import logging
+import os
+from typing import Mapping
+
+import model
+import utils
+from endpoint import EndpointFactory
+from source import Source
+
 DEFAULT_CONFIGURATION = {
     'general': {
         'repositories': 'file://input.csv',
@@ -45,6 +54,82 @@ DEFAULT_CONFIGURATION = {
         'level': 'DEBUG'
     },
 
+    'plagiarism_detection': {
+        'enabled': False,  # Is plagiarism detection enabled
+        'files': [],       # List of files and globs to include in the detection process
+        'exclude_files': ["**/.DS_Store", "**/.*"], # List of files or file patterns to ignore
+        'normalize_pattern': "\s|(//.*)|(/\*(\s\S)*\*/)" # Pattern to run over input file to normalize input characters
+    },
+
     'preconditions': [],
     'tests': []
 }
+
+class ConfigurationBasedObject(object):
+    def __init__(self, config, environment = 'prod'):
+        """
+        Create a new configuration based object and supply the application configuration
+        :param config: The configuration passed by the user (may contain a list in decreasing order of priority)
+        :param environment: Runtime environment to use as optional suffix to configuration parameters
+        """
+        # Set default config as config parameters
+        self.config = {}
+        for key in DEFAULT_CONFIGURATION.keys():
+            self.config[key] = DEFAULT_CONFIGURATION[key].copy()
+
+        config = utils.ensure_list(config)
+        for c in config[::-1]:
+            for key in self.config:
+                if isinstance(self.config[key], Mapping):
+                    for option in self.config[key]:
+                        value = c.get(key, {}).get(option, None)
+                        environment_value = c.get(key, {}).get(f'{option}_{environment}', None)
+                        if environment_value is not None:
+                            self.config[key][option] = environment_value
+                        elif value is not None:
+                            self.config[key][option] = value
+                else:
+                    value = c.get(key, None)
+                    environment_value = c.get(f'{key}_{environment}', None)
+                    if environment_value is not None:
+                        self.config[key] = environment_value
+                    elif value is not None:
+                        self.config[key] = value
+
+        # Setup logging
+        logging.basicConfig()
+        self.logger = logging.getLogger()
+        self.logger.setLevel(self.config['logging']['level'])
+
+        # Setup endpoints
+        EndpointFactory.get().register_endpoint('gitlab', EndpointFactory.TYPE_GITLAB, self.config.get('git'))
+        EndpointFactory.get().register_endpoint('moodle', EndpointFactory.TYPE_MOODLE, self.config.get('moodle'))
+        EndpointFactory.get().register_endpoint('local', EndpointFactory.TYPE_LOCAL, {})
+
+        # Fetch repos
+        self.repositories = self.fetch_targets()
+
+    @property
+    def working_directory(self):
+        d = self.config['general']['directory']
+        return os.path.abspath(d)
+
+    def fetch_targets(self) -> list[model.Repository]:
+        """
+        Fetches the list of repositories to process during execution
+        :return: List of repositories to process
+        """
+        source_urls = utils.ensure_list(self.config['general']['repositories'])
+        if len(source_urls) == 0:
+            raise Exception("No repository sources configured in general->repositories")
+
+        d = self.config['general']['directory']
+        path = os.path.abspath(d)
+        submissions = []
+        for source_url in source_urls:
+            self.logger.debug(f"Processing source: {source_url}")
+            source = Source(source_url, path)
+            submissions += source.submissions
+
+        self.logger.debug(f"Found {len(submissions)} repositories: {submissions}")
+        return submissions

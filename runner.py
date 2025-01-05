@@ -6,6 +6,7 @@ import argparse
 
 from toml import TomlDecodeError
 
+from plagiarism import PlagiarismDetector
 from tester import ExerciseTester
 
 
@@ -32,6 +33,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-e", "--environment", help="Runtime environment (prod by default)",
                         default="prod", action="store", type=str)
+    parser.add_argument("-p", "--plagiarism", help="Perform plagiarism detection tests",
+                        default=False, action="store_true")
     parser.add_argument('config_files', nargs='*')
     arguments = parser.parse_args()
 
@@ -46,8 +49,10 @@ if __name__ == "__main__":
                 logging.error("File %s is not a valid toml: %s" %(configuration_path, tde.msg))
                 sys.exit(1)
 
-    tester = ExerciseTester(configs, arguments.environment)
-    if tester.test():
-        tester.run()
-
-
+    if not arguments.plagiarism:
+        tester = ExerciseTester(configs, arguments.environment)
+        if tester.test():
+            tester.run()
+    else:
+        detector = PlagiarismDetector(configs, arguments.environment)
+        detector.run()
