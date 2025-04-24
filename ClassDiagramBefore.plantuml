@@ -1,0 +1,56 @@
+@startuml InitialSystem
+
+package "Endpoints" {
+  interface Endpoint
+  class GitlabEndpoint
+  class MoodleEndpoint
+  class LocalEndpoint
+
+  Endpoint <|.. GitlabEndpoint
+  Endpoint <|.. MoodleEndpoint
+  Endpoint <|.. LocalEndpoint
+}
+
+package "Core" {
+  class Repository {
+    -endpoint: Endpoint
+    -identifier: str
+    -data: dict
+    -working_directory: str
+    +download()
+    +submit_grade(grade: int, message: str)
+  }
+
+  class TestResult {
+    -repository: Repository
+    -tests: List<TestStepResult>
+    +grade: int
+  }
+
+  class TestStepResult {
+    -test: BasicTest
+    -successful: bool
+    +run()
+  }
+
+  class BasicTest {
+    -options: dict
+    +run(result: TestStepResult)
+  }
+
+  Repository --> Endpoint
+  TestResult --> Repository
+  TestStepResult --> BasicTest
+}
+
+package "Execution" {
+  class ExerciseTester {
+    -repositories: list
+    +run()
+  }
+
+  ExerciseTester --> Repository
+  ExerciseTester --> TestResult
+}
+
+@enduml

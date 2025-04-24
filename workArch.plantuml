@@ -1,0 +1,23 @@
+@startuml title Software Architecture for Plagiarism Detection Tool (Winnowing)
+
+package "Core Engine" {
+    [RollingHashModule] --> [KGramGenerator]
+    [KGramGenerator] --> [HashCalculator]
+    [HashCalculator] --> [FingerprintSelector]
+    [FingerprintSelector] --> [PlagiarismDetector]
+}
+
+package "Optional GUI" {
+    [UserInterface (PyQt)]
+}
+
+package "External Systems" {
+    [GitLabAPI Access]
+    [Local File Loader]
+}
+
+[UserInterface (PyQt)] --> [PlagiarismDetector]
+[Local File Loader] --> [RollingHashModule]
+[GitLabAPI Access] --> [RollingHashModule]
+
+@enduml

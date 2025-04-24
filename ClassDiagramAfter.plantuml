@@ -1,0 +1,38 @@
+@startuml ExtendedSystem
+
+' Base system
+class ExerciseTester
+class Repository
+class BasicTest
+class TestResult
+
+' New components
+package "Plagiarism Detection" {
+  class PlagiarismDetector {
+    -repositories: list
+    +run()
+  }
+
+  class Winnow {
+    -input_file: str
+    -normalize_pattern: str
+    +generate_fingerprints(): set
+  }
+
+  class FingerprintComparator {
+    +compare(repo1, repo2): float
+  }
+
+  PlagiarismDetector --> Repository
+  PlagiarismDetector --> Winnow
+  PlagiarismDetector --> FingerprintComparator
+}
+
+' Fingerprints stored externally
+class RedisCache <<external>>
+
+PlagiarismDetector --> RedisCache
+Winnow --> RedisCache : store/retrieve fingerprints
+FingerprintComparator --> RedisCache
+
+@enduml
