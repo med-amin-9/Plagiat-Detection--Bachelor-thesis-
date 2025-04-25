@@ -17,7 +17,8 @@ DEFAULT_CONFIGURATION = {
         'remove_archive_after_unzip': False,  # Set to true to remove any zip files after auto unzipping took place
         'valid_until': None, # Timestamp until the tests should be executed
         'not_valid_before': None, # Earliest timestamp since when the tests should be executed
-        'repo_filter': [] # Explicit filters for repositories
+        'repo_filter': [], # Explicit filters for repositories
+        'always_update_grades': True # Always publish grades on updated projects even if the grade worsens or is empty
     },
 
     'docker': {

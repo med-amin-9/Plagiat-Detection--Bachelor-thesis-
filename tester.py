@@ -115,8 +115,9 @@ class ExerciseTester(config_module.ConfigurationBasedObject):
                         repo.submit_grade(0, f"Auswertung der Abgabe ist abgestürzt: {e}")
                         continue
 
-                    grade_updated = repo.current_grade != False and \
-                                    (repo.current_grade is None or repo.current_grade < result.grade)
+                    grade_updated = self.config['general']['always_update_grades'] or \
+                                    (repo.current_grade != False and
+                                        (repo.current_grade is None or repo.current_grade < result.grade))
                     if self.config['general']['simulate']:
                         if grade_updated:
                             self.logger.debug(f"Simulated UPDATED Grading {result.grade} for {repo}")
