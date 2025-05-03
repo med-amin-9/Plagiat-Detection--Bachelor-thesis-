@@ -1,6 +1,3 @@
-import re
-import keyword
-
 class RingBuffer(object):
     """
     Implements a simple ring buffer to access
@@ -87,40 +84,7 @@ class RingBuffer(object):
         self.offset = (self.offset + 1) % len(self.data)
         self._length = self._length - 1
         return value
-
-def normalize_code(text: str) -> str:
-    """
-    Normalize code by removing comments, extra whitespace, etc.
-    """
-     # 1. Remove single-line and hash comments
-    text = re.sub(r'//.*?$|#.*?$', '', text, flags=re.MULTILINE)
-
-    # 2. Remove multi-line comments
-    text = re.sub(r'/\\*.*?\\*/', '', text, flags=re.DOTALL)
-
-    # 3. Replace newlines, tabs, and multiple spaces
-    text = re.sub(r'[\\n\\r\\t]', ' ', text)
-    text = re.sub(r'\\s+', ' ', text)
-    text = text.strip()
-
-    # 4. Replace variable names with _v1, _v2, ...
-    tokens = re.findall(r'\\b[a-zA-Z_][a-zA-Z0-9_]*\\b', text)
-    keywords_set = set(keyword.kwlist)
-    builtins_set = set(dir(__builtins__))
-
-    seen_vars = {}
-    var_index = 1
-
-    for token in tokens:
-        if token in keywords_set or token in builtins_set:
-            continue
-        if token not in seen_vars:
-            seen_vars[token] = f'_v{var_index}'
-            var_index += 1
-        text = re.sub(rf'\\b{token}\\b', seen_vars[token], text)
-
-    return text
-
+    
 
 def get_kgrams(text: str, k: int) -> list[str]:
     """
