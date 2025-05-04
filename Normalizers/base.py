@@ -1,4 +1,3 @@
-# base.py
 from abc import ABC, abstractmethod
 
 class CodeNormalizer(ABC):

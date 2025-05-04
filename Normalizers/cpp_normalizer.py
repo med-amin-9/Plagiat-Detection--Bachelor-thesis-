@@ -1,4 +1,3 @@
-# cpp_normalizer.py
 import re
 from .base import CodeNormalizer
 
