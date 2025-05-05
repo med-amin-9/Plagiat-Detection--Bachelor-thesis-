@@ -5,12 +5,25 @@ from .base import CodeNormalizer
 
 class PythonNormalizer(CodeNormalizer):
     def normalize(self, text: str) -> str:
-        text = re.sub(r'#.*', '', text)  # Remove single-line comments
-        text = re.sub(r'""".*?"""|\'\'\'.*?\'\'\'', '', text, flags=re.DOTALL)  # Multiline comments
-        text = re.sub(r'\s+', ' ', text)  # Normalize whitespace
+        # Step 1: Remove comments (single-line and multi-line)
+        text = re.sub(r'#.*', '', text)
+        text = re.sub(r'"""(?:.|\n)*?"""|\'\'\'(?:.|\n)*?\'\'\'', '', text)
 
+        # Step 2: Normalize string literals (single and double quoted)
+        text = re.sub(r'r?f?"(?:\\.|[^"\\])*"', '"_STR"', text)
+        text = re.sub(r"r?f?'(?:\\.|[^'\\])*'", "'_STR'", text)
+        
+        # Step 3: Add space around common symbols
+        for sym in "(){}[]:,=+-*/<>!":
+            text = text.replace(sym, f" {sym} ")
+        
+        # Step 4: Normalize whitespace
+        text = re.sub(r'\s+', ' ', text)
+
+        # Step 5: Normalize user-defined identifiers
         identifiers = re.findall(r'\b[a-zA-Z_][a-zA-Z0-9_]*\b', text)
-        protected = set(keyword.kwlist + dir(builtins))
+        protected = set(keyword.kwlist + dir(builtins)) | {"_STR"}
+
         seen = {}
         var_id = 1
         for ident in identifiers:
