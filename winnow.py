@@ -20,10 +20,42 @@ def get_kgrams(text: str, k: int = 25) -> list[str]:  #25 from the sigmoid paper
 
 def rolling_hash(kgrams: list[str], base: int = 256, prime: int = 101) -> list[int]:
     """
-    Compute rolling hashes for each k-gram using a simple polynomial hash.
+    Compute rolling hashes for a list of k-grams using a simple polynomial hash function.
+    
+    Args:
+        kgrams (list[str]): A list of strings of equal length (k-grams).
+        base (int): The base used in the polynomial hash (default: 256 for ASCII).
+        prime (int): A prime number used as modulus to reduce collisions.
+        
+    Returns:
+        list[int]: A list of integer hash values, one for each k-gram.
     """
-    pass
+    if not kgrams:
+        return []
 
+    k = len(kgrams[0])
+    if any(len(gram) != k for gram in kgrams):
+        raise ValueError("All k-grams must have the same length")
+
+    hashes = []
+
+    # Precompute base^(k-1) % prime
+    high_order = pow(base, k - 1, prime)
+
+    # Compute hash for first k-gram
+    h = 0
+    for char in kgrams[0]:
+        h = (h * base + ord(char)) % prime
+    hashes.append(h)
+
+    # Compute rolling hashes for subsequent k-grams
+    for i in range(1, len(kgrams)):
+        out_char = ord(kgrams[i - 1][0])
+        in_char = ord(kgrams[i][-1])
+        h = ((h - out_char * high_order) * base + in_char) % prime
+        hashes.append(h)
+
+    return hashes
 
 def select_fingerprints(hashes: list[int], window_size: int) -> set[int]:
     """
