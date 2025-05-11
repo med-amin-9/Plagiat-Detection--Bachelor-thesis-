@@ -59,9 +59,45 @@ def rolling_hash(kgrams: list[str], base: int = 256, prime: int = 101) -> list[i
 
 def select_fingerprints(hashes: list[int], window_size: int) -> set[int]:
     """
-    Perform Winnowing by selecting the minimum hash in each sliding window.
+    Select fingerprints using the Winnowing algorithm.
+
+    This function implements the core of the Winnowing technique:
+    from all rolling hashes, it selects the minimum value in every 
+    sliding window of size `w`. To ensure no duplicates and preserve
+    detection properties, it uses both the hash value and its position.
+
+    Args:
+        hashes (list[int]): List of hash values computed from k-grams.
+        window_size (int): Size of the sliding window (w > 0).
+
+    Returns:
+        set[int]: A set of selected fingerprint hashes.
     """
-    pass
+    if not hashes or window_size <= 0:
+        return set()
+
+    fingerprints = set()
+    min_pos = -1
+    min_val = None
+
+    for i in range(len(hashes) - window_size + 1):
+        window = hashes[i:i + window_size]
+
+        # If previous min is outside the window, recompute
+        if min_pos < i:
+            min_val = min(window)
+            min_pos = i + window.index(min_val)
+            fingerprints.add((min_val, min_pos))
+        else:
+            # Compare last element only
+            new_val = window[-1]
+            if new_val <= min_val:
+                min_val = new_val
+                min_pos = i + window_size - 1
+                fingerprints.add((min_val, min_pos))
+
+    # Return only hash values
+    return set(f[0] for f in fingerprints)
 
 
 def robust_winnowing(text: str, k: int, window_size: int) -> set[int]:
