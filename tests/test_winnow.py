@@ -1,5 +1,5 @@
 import pytest
-from winnow import get_kgrams, rolling_hash
+from winnow import get_kgrams, rolling_hash, select_fingerprints
 
 class TestGetKgrams:
     """Test class for the get_kgrams function from the winnow module."""
@@ -83,4 +83,43 @@ class TestRollingHash:
         """Raise error when k-grams are not same length."""
         with pytest.raises(ValueError):
             rolling_hash(["abc", "de"])
-    
+
+class TestSelectFingerprints:
+    """Test class for the select_fingerprints function from the winnow module."""
+
+    def test_finds_minimum_in_each_window(self):
+        """Should select the minimum value in each window of size w."""
+        hashes = [9, 3, 5, 2, 6, 4, 1, 7]
+        w = 4
+        result = select_fingerprints(hashes, w)
+        # Known minima: windows [9,3,5,2] -> 2, [3,5,2,6] -> 2, [5,2,6,4] -> 2, [2,6,4,1] -> 1, [6,4,1,7] -> 1
+        assert 2 in result
+        assert 1 in result
+        assert len(result) >= 2  # Could include more depending on position logic
+
+    def test_no_input(self):
+        """Should return empty set when input is empty."""
+        assert select_fingerprints([], 4) == set()
+
+    def test_window_larger_than_input(self):
+        """Should return empty set when window size is larger than the hash list."""
+        assert select_fingerprints([1, 2, 3], 5) == set()
+
+    def test_single_window(self):
+        """Single window should return minimum only."""
+        hashes = [8, 4, 7]
+        result = select_fingerprints(hashes, 3)
+        assert result == {4}
+
+    def test_duplicate_minima(self):
+        """Duplicate minimums in overlapping windows should not be added more than once."""
+        hashes = [5, 1, 1, 1, 6]
+        result = select_fingerprints(hashes, 3)
+        assert 1 in result
+        assert isinstance(result, set)
+
+    def test_minimum_at_end(self):
+        """Should detect minimum at last possible position."""
+        hashes = [10, 8, 7, 6, 5]
+        result = select_fingerprints(hashes, 2)
+        assert 5 in result
