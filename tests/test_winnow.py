@@ -1,5 +1,5 @@
 import pytest
-from winnow import get_kgrams, rolling_hash, select_fingerprints
+from winnow import get_kgrams, rolling_hash, select_fingerprints, robust_winnowing
 
 class TestGetKgrams:
     """Test class for the get_kgrams function from the winnow module."""
@@ -123,3 +123,36 @@ class TestSelectFingerprints:
         hashes = [10, 8, 7, 6, 5]
         result = select_fingerprints(hashes, 2)
         assert 5 in result
+
+class TestRobustWinnowing:
+    """Test class for the robust_winnowing pipeline."""
+
+    def test_basic_pipeline_python(self):
+        """Basic test with Python code using k=5 and w=4."""
+        code = "def add(a, b): return a + b"
+        result = robust_winnowing(code, language="python", k=5, window_size=4)
+        assert isinstance(result, set)
+        assert len(result) > 0
+
+    def test_basic_pipeline_cpp(self):
+        """Basic test with C++ code using k=5 and w=4."""
+        code = "int add(int a, int b) { return a + b; }"
+        result = robust_winnowing(code, language="cpp", k=5, window_size=4)
+        assert isinstance(result, set)
+        assert len(result) > 0
+
+    def test_empty_code(self):
+        """Empty source code should return empty set."""
+        result = robust_winnowing("", language="python", k=5, window_size=4)
+        assert result == set()
+
+    def test_window_larger_than_hashes(self):
+        """If window is too large, no fingerprint should be returned."""
+        code = "print('ok')"
+        result = robust_winnowing(code, "python", k=10, window_size=50)
+        assert result == set()
+
+    def test_invalid_language(self):
+        """Should raise ValueError if language not supported."""
+        with pytest.raises(ValueError):
+            robust_winnowing("x = 1", language="javascript", k=5, window_size=4)
