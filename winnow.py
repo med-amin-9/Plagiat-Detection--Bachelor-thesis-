@@ -57,7 +57,7 @@ def rolling_hash(kgrams: list[str], base: int = 256, prime: int = 101) -> list[i
 
     return hashes
 
-def select_fingerprints(hashes: list[int], window_size: int) -> set[int]:
+def select_fingerprints(hashes: list[int], window_size: int = 21) -> set[int]:
     """
     Select fingerprints using the Winnowing algorithm.
 
@@ -89,9 +89,8 @@ def select_fingerprints(hashes: list[int], window_size: int) -> set[int]:
             min_pos = i + window.index(min_val)
             fingerprints.add((min_val, min_pos))
         else:
-            # Compare last element only
             new_val = window[-1]
-            if new_val <= min_val:
+            if min_val is None or new_val <= min_val:
                 min_val = new_val
                 min_pos = i + window_size - 1
                 fingerprints.add((min_val, min_pos))
@@ -99,10 +98,36 @@ def select_fingerprints(hashes: list[int], window_size: int) -> set[int]:
     # Return only hash values
     return set(f[0] for f in fingerprints)
 
+from normalizers.normalizer_factory import get_normalizer
+from winnow import get_kgrams, rolling_hash, select_fingerprints
 
-def robust_winnowing(text: str, k: int, window_size: int) -> set[int]:
+def robust_winnowing(text: str, language: str, k: int, window_size: int) -> set[int]:
     """
-    Perform the full robust winnowing pipeline:
-    normalize -> k-grams -> rolling hash -> fingerprint selection.
+    Perform the full Winnowing pipeline to detect document fingerprints.
+
+    This function normalizes the input text based on the programming language,
+    extracts k-grams, computes rolling hashes, and selects fingerprints.
+
+    Args:
+        text (str): Raw source code as string.
+        language (str): Programming language (e.g., 'python', 'cpp', 'c').
+        k (int): Length of each k-gram.
+        window_size (int): Size of sliding window used for fingerprinting.
+
+    Returns:
+        set[int]: Selected fingerprint hash values.
     """
-    pass
+    # Step 1: Normalize
+    normalizer = get_normalizer(language)
+    normalized_text = normalizer.normalize(text)
+
+    # Step 2: Generate k-grams
+    kgrams = get_kgrams(normalized_text, k)
+
+    # Step 3: Compute hashes
+    hashes = rolling_hash(kgrams)
+
+    # Step 4: Winnow the hashes to fingerprints
+    fingerprints = select_fingerprints(hashes, window_size)
+
+    return fingerprints
