@@ -1,4 +1,4 @@
-from utils import RingBuffer
+from normalizers.normalizer_factory import get_normalizer
 
 def get_kgrams(text: str, k: int = 25) -> list[str]:  #25 from the sigmoid paper for larger projects (40-60)
     """
@@ -97,9 +97,6 @@ def select_fingerprints(hashes: list[int], window_size: int = 21) -> set[int]:
 
     # Return only hash values
     return set(f[0] for f in fingerprints)
-
-from normalizers.normalizer_factory import get_normalizer
-from winnow import get_kgrams, rolling_hash, select_fingerprints
 
 def robust_winnowing(text: str, language: str, k: int, window_size: int) -> set[int]:
     """
