@@ -5,19 +5,7 @@ from zipfile import BadZipfile
 
 import config as config_module
 
-
-class Winnow(object):
-    """
-    Winnowing algorithm for an input file
-    """
-    def __init__(self, input_file, normalize_pattern=None):
-        """
-        Create a new Winnowing algorithm instance for the given file
-        :param input_file: Input file to analyze
-        :param normalize_pattern: Normalization to apply to the file content
-        """
-        self.input_file = input_file
-        self.normalize_pattern = normalize_pattern
+from winnow import robust_winnowing
 
 
 class PlagiarismDetector(config_module.ConfigurationBasedObject):
@@ -75,3 +63,40 @@ class PlagiarismDetector(config_module.ConfigurationBasedObject):
             for file in filtered_files:
                 # TODO: analyse files
                 pass
+
+def generate_fingerprints(self, repo):
+    """
+    Generate fingerprints for each relevant file in a repository using robust winnowing.
+    Stores results in repo.fingerprints[filename] = set of hashes.
+    """
+    # According to Schleimer et al. (SIGMOD 2003), the rule of thumb is:
+    #     w = k - t + 1
+    # where t is the minimum match length (in characters) that guarantees at least one shared fingerprint.
+    #
+    # Example: If k = 25 and t = 25 (i.e., an exact match of 25 characters is required), then:
+    #     w = 25 - 25 + 1 = 1
+    #
+    # In practice, we typically use k = 25 and w = 21, which guarantees detection for matches of at least
+    # t = k + w - 1 = 45 characters — a value that strikes a good balance between sensitivity and robustness
+    # in real-world software projects.
+    #
+    # For testing purposes, especially with small code snippets or toy examples where total length is less than 45 characters,
+    # smaller values such as k = 5 and w = 4 can be used to ensure the algorithm still produces fingerprints.
+    #
+    # Therefore, in the configuration, we use fixed default values (k = 25, w = 21) instead of computing t explicitly,
+    # to keep the parameterization simple and consistent.
+     
+    k = self.config["plagiarism_detection"].get("k", 25)
+    window = self.config["plagiarism_detection"].get("window", 21)
+    language = self.config["plagiarism_detection"].get("language", "python")
+
+    repo.fingerprints = {}
+
+    for filename in repo.files:
+        try:
+            text = repo.read_file(filename)
+            fingerprints = robust_winnowing(text, language=language, k=k, window_size=window)
+            repo.fingerprints[filename] = fingerprints
+        except Exception as e:
+            self.logger.warning(f"Error processing {filename} in {repo.identifier}: {e}")
+    
