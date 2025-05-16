@@ -80,11 +80,8 @@ def generate_fingerprints(self, repo):
     # t = k + w - 1 = 45 characters — a value that strikes a good balance between sensitivity and robustness
     # in real-world software projects.
     #
-    # For testing purposes, especially with small code snippets or toy examples where total length is less than 45 characters,
+    # For testing purposes, especially with small code snippets where total length is less than 45 characters,
     # smaller values such as k = 5 and w = 4 can be used to ensure the algorithm still produces fingerprints.
-    #
-    # Therefore, in the configuration, we use fixed default values (k = 25, w = 21) instead of computing t explicitly,
-    # to keep the parameterization simple and consistent.
      
     k = self.config["plagiarism_detection"].get("k", 25)
     window = self.config["plagiarism_detection"].get("window", 21)
@@ -99,4 +96,4 @@ def generate_fingerprints(self, repo):
             repo.fingerprints[filename] = fingerprints
         except Exception as e:
             self.logger.warning(f"Error processing {filename} in {repo.identifier}: {e}")
-    
+            
