@@ -22,7 +22,7 @@ class PythonNormalizer(CodeNormalizer):
 
         # Step 5: Normalize user-defined identifiers
         identifiers = re.findall(r'\b[a-zA-Z_][a-zA-Z0-9_]*\b', text)
-        protected = set(keyword.kwlist + dir(builtins)) | {"_STR"}
+        protected = set(list(keyword.kwlist) + list(dir(builtins))) | {"_STR"}
 
         seen = {}
         var_id = 1
