@@ -58,7 +58,7 @@ DEFAULT_CONFIGURATION = {
         'enabled': False,  # Is plagiarism detection enabled
         'files': [],       # List of files and globs to include in the detection process
         'exclude_files': ["**/.DS_Store", "**/.*"], # List of files or file patterns to ignore
-        'normalize_pattern': "\s|(//.*)|(/\*(\s\S)*\*/)" # Pattern to run over input file to normalize input characters
+        'normalize_pattern': r"\s|(//.*)|(/\*(\s\S)*\*/)" # Pattern to run over input file to normalize input characters
     },
 
     'preconditions': [],
@@ -102,8 +102,8 @@ class ConfigurationBasedObject(object):
         self.logger.setLevel(self.config['logging']['level'])
 
         # Setup endpoints
-        EndpointFactory.get().register_endpoint('gitlab', EndpointFactory.TYPE_GITLAB, self.config.get('git'))
-        EndpointFactory.get().register_endpoint('moodle', EndpointFactory.TYPE_MOODLE, self.config.get('moodle'))
+        #EndpointFactory.get().register_endpoint('gitlab', EndpointFactory.TYPE_GITLAB, self.config.get('git'))
+        #EndpointFactory.get().register_endpoint('moodle', EndpointFactory.TYPE_MOODLE, self.config.get('moodle'))
         EndpointFactory.get().register_endpoint('local', EndpointFactory.TYPE_LOCAL, {})
 
         # Fetch repos
