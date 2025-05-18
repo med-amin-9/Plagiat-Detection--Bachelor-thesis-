@@ -36,7 +36,12 @@ class Repository(object):
         self._data = data
         self.working_directory = tempfile.gettempdir()
         self._metadata = None
+        # optional list injected by plagiarism detector (or others)
+        self._filtered_files = None
 
+    # ---------------------------------------------------------------------
+    # endpoint helpers
+    # ---------------------------------------------------------------------
     @property
     def current_grade(self):
         return self._endpoint.get_current_grade(self)
@@ -47,13 +52,12 @@ class Repository(object):
     def has_update(self) -> bool:
         return self._endpoint.has_update(self)
 
-    def is_locked(self, consider_own_pid_locked = True) -> bool:
+    # ---------------------------------------------------------------------
+    # locking helpers
+    # ---------------------------------------------------------------------
+    def is_locked(self, consider_own_pid_locked=True) -> bool:
         """
-        Test if this repository is locked
-        This check return true if a lock file is present, and evaluate the stored PID
-        the pid of this process
-        :param consider_own_pid_locked: Set to True if you want to consider to repo locked even if the current PID holds the lock
-        :return: True if locked else false
+        Check if this repository is locked.
         """
         if not os.path.isfile(self.lock_path):
             return False
@@ -63,26 +67,22 @@ class Repository(object):
         return locked_pid.isdigit() and (consider_own_pid_locked or pid != int(locked_pid))
 
     def lock(self):
-        """
-        Create a new lock file for this repository
-        """
         if self.is_locked(False):
             raise Exception("Repository is already locked")
-
-        pid = os.getpid()
         with open(self.lock_path, "w") as fd:
-            fd.write(str(pid))
+            fd.write(str(os.getpid()))
 
-    def unlock(self, force = False):
-        """
-        Unlock this repository
-        """
+    def unlock(self, force=False):
         if self.is_locked(False) and not force:
-            raise Exception("Repository is already locked by another process - your not allowed to remove this lock")
-
+            raise Exception(
+                "Repository is already locked by another process – you’re not allowed to remove this lock"
+            )
         if os.path.isfile(self.lock_path):
             os.remove(self.lock_path)
 
+    # ---------------------------------------------------------------------
+    # grading helpers
+    # ---------------------------------------------------------------------
     def unzip(self, remove_archive: bool):
         return self._endpoint.unzip(self, remove_archive)
 
@@ -92,6 +92,9 @@ class Repository(object):
         self.metadata[Repository.MODIFIED_AT_METADATA_KEY] = timestamp
         self._save_metadata()
 
+    # ---------------------------------------------------------------------
+    # simple accessors
+    # ---------------------------------------------------------------------
     @property
     def endpoint(self):
         return self._endpoint
@@ -106,40 +109,70 @@ class Repository(object):
 
     @property
     def directory(self):
-        return f'repo_{self.identifier}'
+        return f"repo_{self.identifier}"
 
     @property
     def path(self):
-        return f'{self.working_directory}/repo_{self.identifier}'
+        return f"{self.working_directory}/repo_{self.identifier}"
 
+    # ---------------------------------------------------------------------
+    # **modified** files property  (getter + NEW setter)
+    # ---------------------------------------------------------------------
     @property
     def files(self):
+        """
+        Return all files in the repo unless an external tool
+        has already supplied a filtered list.
+        """
+        if self._filtered_files is not None:
+            return self._filtered_files
+
         result = []
         p = self.path
         for root, dirs, files in os.walk(p):
             for f in files:
                 absolute_path = os.path.join(root, f)
                 result.append(os.path.relpath(absolute_path, p))
-
         return result
+    
+    # -----------------------------------------------------------------
+    # optional helper the plagiarism detector expects
+    # -----------------------------------------------------------------
+    def read_file(self, relative_path, mode="r"):
+        """
+        Return the contents of a file inside this repository.
+        """
+        abs_path = os.path.join(self.path, relative_path)
+        with open(abs_path, mode) as f:
+            return f.read()
 
+    @files.setter
+    def files(self, value):
+        """
+        Allow external tools (plagiarism detector, unit-test filter, …)
+        to override the automatic file list.
+        """
+        self._filtered_files = value
+
+    # ---------------------------------------------------------------------
+    # metadata & misc
+    # ---------------------------------------------------------------------
     @property
     def metadata_path(self):
-        return f'{self.working_directory}/repo_{self.identifier}_meta.toml'
+        return f"{self.working_directory}/repo_{self.identifier}_meta.toml"
 
     @property
     def lock_path(self):
-        return f'{self.working_directory}/repo_{self.identifier}.lock'
+        return f"{self.working_directory}/repo_{self.identifier}.lock"
 
     @property
     def metadata(self):
         if self._metadata is None:
             if os.path.isfile(self.metadata_path):
-                with open(self.metadata_path, 'r') as fd:
+                with open(self.metadata_path, "r") as fd:
                     self._metadata = toml.load(fd)
             else:
                 self._metadata = {}
-
         return self._metadata
 
     @metadata.setter
@@ -152,21 +185,13 @@ class Repository(object):
         return self._endpoint.supports_unzip
 
     def _save_metadata(self):
-        """
-        Save the current metadata to disk
-        :return: None
-        """
-        with open(self.metadata_path, 'w') as fd:
+        with open(self.metadata_path, "w") as fd:
             toml.dump(self._metadata, fd)
 
+    # ---------------------------------------------------------------------
     def __repr__(self):
-        """
-        String representation of the repository
-        :return: Output string
-        """
         return f"Repository({self.identifier} -> {self.path})"
-
-
+    
 class TestResult(object):
     """
     Test result reflecting an executed test on a repository
