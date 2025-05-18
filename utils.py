@@ -42,7 +42,7 @@ class RingBuffer(object):
         self.index  = -1
         self.data = [None] * k
         self.offset = 0
-        self._length = 0          #underscore means this is a private Python does not force privacy. It's just a strong suggestion to other programmers: it's internal dont mess with it
+        self._length = 0 
 
     @property
     def full(self) -> bool:
@@ -52,7 +52,7 @@ class RingBuffer(object):
     def length(self) -> int:
         return self._length
 
-    def __len__(self):    #DUnder methods or magic methods These are special functions that Python automatically calls for you when you use built-in operations so you can do: if len(buffer) instead of if buffer.length or by print.  
+    def __len__(self):    
         return self._length
 
     def __getitem__(self, index):
