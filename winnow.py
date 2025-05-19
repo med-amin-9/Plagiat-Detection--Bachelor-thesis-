@@ -128,36 +128,3 @@ def robust_winnowing(text: str, language: str, k: int, window_size: int) -> set[
     fingerprints = select_fingerprints(hashes, window_size)
 
     return fingerprints
-
-def compare_all_submissions(self):
-    """
-    Compares all student submissions using Jaccard similarity.
-    Groups similarities across all repositories and flags results above a threshold.
-    """
-    threshold = self.config["plagiarism_detection"].get("threshold", 0.5)
-    all_files = []
-
-    for repo in self.repositories:
-        for fname, fp in repo.fingerprints.items():
-            all_files.append((repo.identifier, fname, fp))
-
-    for i in range(len(all_files)):
-        for j in range(i + 1, len(all_files)):
-            id1, file1, fp1 = all_files[i]
-            id2, file2, fp2 = all_files[j]
-
-            if not fp1 or not fp2:
-                continue
-
-            intersection = len(fp1 & fp2)
-            union = len(fp1 | fp2)
-            if union == 0:
-                continue
-
-            jaccard = intersection / union
-            if jaccard >= threshold:
-                self.results.append({
-                    "file_1": f"{id1}/{file1}",
-                    "file_2": f"{id2}/{file2}",
-                    "similarity": round(jaccard, 4)
-                })
