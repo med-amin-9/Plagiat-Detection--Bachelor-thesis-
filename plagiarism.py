@@ -1,66 +1,63 @@
 import fnmatch
 import os
 import re
-from zipfile import BadZipfile
+import json
+import datetime
+from zipfile import BadZipFile
 
 import config as config_module
-
 from winnow import robust_winnowing
 
 
 class PlagiarismDetector(config_module.ConfigurationBasedObject):
+    """
+    Detects plagiarism between student submissions using fingerprinting and similarity metrics.
+    """
+
     def __init__(self, config, environment='prod'):
-        """
-        Create a new exercise tester and supply the application configuration
-        :param config: The configuration passed by the user (may contain a list in decreasing order of priority)
-        :param environment: Runtime environment to use as optional suffix to configuration parameters
-        """
-        # Set default config as config parameters
         super().__init__(config, environment)
+        self.results = []
 
     def run(self):
         """
         Process data in all repositories and build documents to search for plagiarisms
         :return: None
         """
-        included_files = []
-        for item in self.config['plagiarism_detection'].get('files', []):
-            included_files.append(re.compile(fnmatch.translate(item)))
-
-        excluded_files = []
-        for item in self.config['plagiarism_detection'].get('exclude_files', []):
-            excluded_files.append(re.compile(fnmatch.translate(item)))
+        included_files = [re.compile(fnmatch.translate(p)) for p in self.config['plagiarism_detection'].get('files', [])]
+        excluded_files = [re.compile(fnmatch.translate(p)) for p in self.config['plagiarism_detection'].get('exclude_files', [])]
 
         for repo in self.repositories:
             if self.config['general']['repo_filter'] and repo.identifier not in self.config['general']['repo_filter']:
-                self.logger.info(f"Skipping because Repo {repo} not in filter list")
+                self.logger.info(f"Skipping repo {repo.identifier} not in filter list")
                 continue
 
-            # Download repo content
             if repo.endpoint.require_download_before_update_check():
                 repo.download()
 
             if repo.has_update():
                 if not repo.endpoint.require_download_before_update_check():
-                    self.logger.debug(f"Late fetching repository {repo}")
+                    self.logger.debug(f"Late fetching repository {repo.identifier}")
                     repo.download()
 
-                # Check if we should unzip the content
-                if self.config['general']['unzip_submissions'] and repo.supports_unzip:
+                if self.config['general'].get('unzip_submissions', False) and getattr(repo, 'supports_unzip', False):
                     try:
-                        repo.unzip(self.config['general']['remove_archive_after_unzip'])
-                    except BadZipfile:
-                        self.logger.info(f"Skipping Repo {repo} because of corrupt archive")
+                        repo.unzip(self.config['general'].get('remove_archive_after_unzip', False))
+                    except BadZipFile:
+                        self.logger.info(f"Skipping repo {repo.identifier} because of corrupt archive")
                         continue
 
+            # Filter relevant files
             filtered_files = repo.files
             if included_files:
-                filtered_files = list(filter(lambda f: any([re.match(x, f) for x in included_files]), filtered_files))
-
+                filtered_files = list(filter(lambda f: any(r.match(f) for r in included_files), filtered_files))
             if excluded_files:
-                filtered_files = list(filter(lambda f: all([not re.match(x, f) for x in excluded_files]), filtered_files))
-        
-        self.compare_all_submissions()    
+                filtered_files = list(filter(lambda f: all(not r.match(f) for r in excluded_files), filtered_files))
+
+            setattr(repo, "files", filtered_files)
+            self.generate_fingerprints(repo)
+
+        self.compare_all_submissions()
+        self.export_results()
 
     def generate_fingerprints(self, repo):
         """
@@ -85,7 +82,7 @@ class PlagiarismDetector(config_module.ConfigurationBasedObject):
         window = self.config["plagiarism_detection"].get("window", 21)
         language = self.config["plagiarism_detection"].get("language", "python")
 
-        repo.fingerprints = {}
+        setattr(repo, "fingerprints", {})
 
         for filename in repo.files:
             try:
@@ -94,16 +91,18 @@ class PlagiarismDetector(config_module.ConfigurationBasedObject):
                 repo.fingerprints[filename] = fingerprints
             except Exception as e:
                 self.logger.warning(f"Error processing {filename} in {repo.identifier}: {e}")
-                
+
     def compare_all_submissions(self):
         """
-        Compares all student submissions using Jaccard similarity.
-        Groups similarities across all repositories and flags results above a threshold.
+        Compare all submissions using Jaccard similarity and store results above threshold.
         """
         threshold = self.config["plagiarism_detection"].get("threshold", 0.5)
         all_files = []
 
         for repo in self.repositories:
+            if not hasattr(repo, 'fingerprints'):
+                self.logger.warning(f"Skipping repo {repo.identifier}: no fingerprints generated")
+                continue
             for fname, fp in repo.fingerprints.items():
                 all_files.append((repo.identifier, fname, fp))
 
@@ -127,4 +126,18 @@ class PlagiarismDetector(config_module.ConfigurationBasedObject):
                         "file_2": f"{id2}/{file2}",
                         "similarity": round(jaccard, 4)
                     })
-            
+
+    def export_results(self):
+        """
+        Export plagiarism detection results to a timestamped JSON file.
+        """
+        base_output = self.config["plagiarism_detection"].get("output", "plagiarism_results")
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        output_file = f"{base_output}_{timestamp}.json"
+
+        try:
+            with open(output_file, "w", encoding="utf-8") as f:
+                json.dump(self.results, f, indent=4)
+            self.logger.info(f"Plagiarism report written to {output_file}")
+        except Exception as e:
+            self.logger.error(f"Failed to export plagiarism results: {e}")
