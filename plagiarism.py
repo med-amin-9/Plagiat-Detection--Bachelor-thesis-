@@ -111,6 +111,12 @@ class PlagiarismDetector(config_module.ConfigurationBasedObject):
                 id1, file1, fp1 = all_files[i]
                 id2, file2, fp2 = all_files[j]
 
+                # Skip comparison if files have different extensions
+                ext1 = os.path.splitext(file1.lower())[1] or os.path.basename(file1.lower())
+                ext2 = os.path.splitext(file2.lower())[1] or os.path.basename(file2.lower())
+                if ext1 != ext2:
+                    continue
+
                 if not fp1 or not fp2:
                     continue
 
