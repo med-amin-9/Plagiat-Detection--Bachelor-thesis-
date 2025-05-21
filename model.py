@@ -38,6 +38,7 @@ class Repository(object):
         self._metadata = None
         # optional list injected by plagiarism detector (or others)
         self._filtered_files = None
+        self.fingerprints = {}  # Stores fingerprints for plagiarism detection
 
     # ---------------------------------------------------------------------
     # endpoint helpers
