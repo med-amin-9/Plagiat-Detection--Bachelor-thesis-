@@ -97,7 +97,7 @@ class ConfigurationBasedObject(object):
                         self.config[key] = value
 
         # Setup logging
-        logging.basicConfig()
+        logging.basicConfig(level=logging.DEBUG)  # Ensure debug logs are captured
         self.logger = logging.getLogger()
         self.logger.setLevel(self.config['logging']['level'])
 
