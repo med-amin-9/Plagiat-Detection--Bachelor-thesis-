@@ -47,6 +47,7 @@ DEFAULT_CONFIGURATION = {
         'uri': None,       # URI to use as base for requests
         'username': None,  # Username to use for authentication at the moodle instance
         'password': None,  # Password to use for username
+        'token': None,     # Token to use instead of username / password authentication
         'service': 'moodle_mobile_app',  # Name of the service to use when fetching auth tokens
         'use_previous_attempt_for_reopened_submissions': True
     },

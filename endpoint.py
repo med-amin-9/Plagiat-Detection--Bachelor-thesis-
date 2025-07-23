@@ -398,18 +398,21 @@ class MoodleEndpoint(Endpoint):
         """
         super().__init__(configuration, config.DEFAULT_CONFIGURATION.get('moodle', {}))
 
-        # Fetch authentication token
-        token_endpoint = f"{self.api_endpoint}/login/token.php"
-        params = {
-            "username": self.configuration['username'],
-            "password": self.configuration['password'],
-            "service": self.configuration['service']
-        }
-        result = requests.get(token_endpoint, params=params)
-        if not result.ok or not result.json().get('token'):
-            raise Exception(result.text)
+        if self.configuration.get('token') is not None:
+            self.token = self.configuration['token']
+        else:
+            # Fetch authentication token
+            token_endpoint = f"{self.api_endpoint}/login/token.php"
+            params = {
+                "username": self.configuration['username'],
+                "password": self.configuration['password'],
+                "service": self.configuration['service']
+            }
+            result = requests.get(token_endpoint, params=params)
+            if not result.ok or not result.json().get('token'):
+                raise Exception(result.text)
 
-        self.token = result.json().get('token')
+            self.token = result.json().get('token')
 
         # Fetch authenticated user information
         user_info = self._call('GET', 'core_webservice_get_site_info')
@@ -452,29 +455,40 @@ class MoodleEndpoint(Endpoint):
 
     def validate_configuration(self) -> None:
         assert self.configuration['uri'] is not None
-        assert self.configuration['username'] is not None
-        assert self.configuration['password'] is not None
+        if self.configuration.get('token') is None:
+            assert self.configuration['username'] is not None
+            assert self.configuration['password'] is not None
+        else:
+            assert self.configuration['username'] is None
+            assert self.configuration['password'] is None
 
-    def get_repositories(self, course_name: str, assignment_name: str) -> list[model.Repository]:
+    def get_repositories(self, course_name, assignment_name: str) -> list[model.Repository]:
         """
         Read moodle submissions from the given course and assignment
-        :param course_name: shortname of the course to fetch submissions from
+        :param course_name: shortname or id of the course to fetch submissions from
         :param assignment_name: name of the assignment to fetch submissions from
         :return: assignment submission repositories
         """
-        # Fetch course info
-        courses = self._call('GET', 'core_enrol_get_users_courses', {'userid': self.user_id})
-        if not courses:
-            raise Exception("Failed to get courses from endpoint")
+        if type(course_name) == int:
+            course_id = course_name
+        elif re.match(r'[0-9]+', course_name):
+            # Course name seems like a id
+            course_id = int(course_name)
+        else:
+            # Fetch course info based on course name
+            courses = self._call('GET', 'core_enrol_get_users_courses', {'userid': self.user_id})
+            if not courses:
+                raise Exception("Failed to get courses from endpoint")
 
-        course = next((x for x in courses if x.get("shortname") == course_name), None)
-        if not course:
-            raise Exception(f"Could not get course {course_name} in list of user courses")
+            course = next((x for x in courses if x.get("shortname") == course_name), None)
+            if not course:
+                raise Exception(f"Could not get course {course_name} in list of user courses")
+
+            course_id = course.get("id")
 
         # Fetch the desired assignment
-        course_id = course.get("id")
         course_content = self._call('GET', 'core_course_get_contents', {'courseid': course_id})
-        if not courses:
+        if not course_content:
             raise course_content(f"Could not get course content of {course_name}")
 
         assignment_module = None
