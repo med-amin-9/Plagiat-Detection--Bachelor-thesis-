@@ -297,3 +297,8 @@ poetry.toml
 pyrightconfig.json
 
 # End of https://www.toptal.com/developers/gitignore/api/macos,python,pycharm+all
+
+# Custom additions
+*.plantuml
+Archiv.zip
+sigmod03.pdf

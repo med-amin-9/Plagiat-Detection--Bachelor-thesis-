@@ -35,6 +35,7 @@ if __name__ == "__main__":
                         default="prod", action="store", type=str)
     parser.add_argument("-p", "--plagiarism", help="Perform plagiarism detection tests",
                         default=False, action="store_true")
+    parser.add_argument("--language", help="Programming language (e.g. python, cpp)", type=str)
     parser.add_argument('config_files', nargs='*')
     arguments = parser.parse_args()
 
@@ -48,6 +49,12 @@ if __name__ == "__main__":
             except TomlDecodeError as tde:
                 logging.error("File %s is not a valid toml: %s" %(configuration_path, tde.msg))
                 sys.exit(1)
+
+    # Apply --language if provided
+    if arguments.plagiarism and arguments.language:
+        for config in configs:
+            config.setdefault("plagiarism_detection", {})
+            config["plagiarism_detection"]["language"] = arguments.language
 
     if not arguments.plagiarism:
         tester = ExerciseTester(configs, arguments.environment)
